@@ -29,6 +29,17 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Must run before any ES module so react-router can use crypto -->
+    <script>
+      if (typeof window.crypto === 'undefined') window.crypto = {};
+      if (typeof window.crypto.getRandomValues === 'undefined') {
+        window.crypto.getRandomValues = function(arr) {
+          for (var i = 0; i < arr.length; i++)
+            arr[i] = Math.floor(Math.random() * 256);
+          return arr;
+        };
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
