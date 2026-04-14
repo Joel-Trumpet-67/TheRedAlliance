@@ -31,6 +31,7 @@
 }
 
 html {
+  background: #111111;
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
 }
