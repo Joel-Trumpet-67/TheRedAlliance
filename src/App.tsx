@@ -5,21 +5,24 @@ import { Teams } from './pages/Teams';
 import { TeamDetail } from './pages/TeamDetail';
 import { Events } from './pages/Events';
 import { EventDetail } from './pages/EventDetail';
+import { TeamsProvider } from './context/TeamsContext';
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Navbar />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/teams" element={<Teams />} />
-        <Route path="/teams/:number" element={<TeamDetail />} />
-        <Route path="/events" element={<Events />} />
-        <Route path="/events/:key" element={<EventDetail />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-      <BottomNav />
-    </BrowserRouter>
+    <TeamsProvider>
+      <BrowserRouter>
+        <Navbar />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/teams" element={<Teams />} />
+          <Route path="/teams/:number" element={<TeamDetail />} />
+          <Route path="/events" element={<Events />} />
+          <Route path="/events/:key" element={<EventDetail />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+        <BottomNav />
+      </BrowserRouter>
+    </TeamsProvider>
   );
 }
 

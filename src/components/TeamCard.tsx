@@ -13,13 +13,16 @@ export function TeamCard({ team }: Props) {
           <div className="team-number-badge">{team.number}</div>
           <div className="team-info">
             <div className="team-name">{team.name}</div>
-            <div className="team-location">{team.city}, {team.state} · Since {team.rookie_year}</div>
+            <div className="team-location">
+              {[team.city, team.state, team.country].filter(Boolean).join(', ')}
+              {team.rookie_year ? ` · Since ${team.rookie_year}` : ''}
+            </div>
           </div>
           <div className="team-record">
             <div className="record-text">{team.wins}-{team.losses}-{team.ties}</div>
-            {team.awards > 0 && (
-              <div style={{ fontSize: '0.75rem', color: '#fbbf24', marginTop: 2 }}>
-                🏆 {team.awards}
+            {team.epa != null && (
+              <div style={{ fontSize: '0.72rem', color: 'var(--red-400)', marginTop: 2, fontWeight: 600 }}>
+                EPA {team.epa.toFixed(0)}
               </div>
             )}
           </div>

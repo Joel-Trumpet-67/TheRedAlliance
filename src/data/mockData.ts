@@ -11,6 +11,8 @@ export interface Team {
   ties: number;
   awards: number;
   ranking?: number;
+  /** Normalised EPA from Statbotics (higher = stronger team) */
+  epa?: number;
 }
 
 export interface Match {
@@ -51,28 +53,9 @@ export interface Ranking {
   avg_score: number;
 }
 
-export const teams: Team[] = [
-  { number: 254, name: "The Cheesy Poofs", city: "San Jose", state: "CA", country: "USA", rookie_year: 1999, motto: "Robots don't quit", wins: 412, losses: 87, ties: 3, awards: 148 },
-  { number: 1114, name: "Simbotics", city: "St. Catharines", state: "ON", country: "Canada", rookie_year: 2003, motto: "Sine Mora", wins: 389, losses: 102, ties: 5, awards: 132 },
-  { number: 2056, name: "OP Robotics", city: "Mississauga", state: "ON", country: "Canada", rookie_year: 2007, motto: "Orange Pride", wins: 356, losses: 118, ties: 2, awards: 119 },
-  { number: 118, name: "Robonauts", city: "Houston", state: "TX", country: "USA", rookie_year: 1997, motto: "Excellence through hard work", wins: 341, losses: 127, ties: 4, awards: 107 },
-  { number: 1678, name: "Citrus Circuits", city: "Davis", state: "CA", country: "USA", rookie_year: 2005, motto: "Simply the best", wins: 334, losses: 134, ties: 6, awards: 98 },
-  { number: 3310, name: "Black Hawk Robotics", city: "Rock Hill", state: "SC", country: "USA", rookie_year: 2010, motto: "Lift off!", wins: 298, losses: 156, ties: 1, awards: 86 },
-  { number: 4414, name: "HighTide", city: "Aptos", state: "CA", country: "USA", rookie_year: 2013, motto: "Rise with the tide", wins: 276, losses: 168, ties: 3, awards: 74 },
-  { number: 6328, name: "Mechanical Advantage", city: "Littleton", state: "MA", country: "USA", rookie_year: 2017, motto: "Work smarter, not harder", wins: 264, losses: 172, ties: 0, awards: 67 },
-  { number: 148, name: "Robowranglers", city: "Greenville", state: "TX", country: "USA", rookie_year: 1992, motto: "Wrangling robots since '92", wins: 312, losses: 143, ties: 2, awards: 91 },
-  { number: 971, name: "Spartan Robotics", city: "Mountain View", state: "CA", country: "USA", rookie_year: 2002, motto: "Spartan spirit", wins: 287, losses: 159, ties: 4, awards: 83 },
-  { number: 1619, name: "Up-A-Creek Robotics", city: "New Milford", state: "CT", country: "USA", rookie_year: 2005, motto: "Never up a creek", wins: 245, losses: 188, ties: 2, awards: 61 },
-  { number: 330, name: "Beach Bot", city: "Santa Monica", state: "CA", country: "USA", rookie_year: 1997, motto: "Beach bots rule", wins: 298, losses: 167, ties: 5, awards: 79 },
-  { number: 2910, name: "Jack In The Bot", city: "Bonney Lake", state: "WA", country: "USA", rookie_year: 2009, motto: "Pop goes the robot", wins: 267, losses: 178, ties: 3, awards: 72 },
-  { number: 5406, name: "Celt-X", city: "Quebec City", state: "QC", country: "Canada", rookie_year: 2015, motto: "For the love of robots", wins: 234, losses: 198, ties: 1, awards: 58 },
-  { number: 3538, name: "RoboJackets", city: "Atlanta", state: "GA", country: "USA", rookie_year: 2011, motto: "Building the future", wins: 221, losses: 209, ties: 4, awards: 49 },
-  { number: 1241, name: "THEORY6", city: "Hamilton", state: "ON", country: "Canada", rookie_year: 2003, motto: "Theory into practice", wins: 256, losses: 184, ties: 2, awards: 65 },
-  { number: 7492, name: "Absolute Zero", city: "Anchorage", state: "AK", country: "USA", rookie_year: 2019, motto: "Cold as ice", wins: 134, losses: 218, ties: 0, awards: 22 },
-  { number: 4910, name: "WarriorBots", city: "Dallas", state: "TX", country: "USA", rookie_year: 2013, motto: "Forged in Texas", wins: 198, losses: 214, ties: 3, awards: 41 },
-  { number: 3175, name: "AllStars", city: "Portland", state: "OR", country: "USA", rookie_year: 2010, motto: "Stars aligned", wins: 212, losses: 202, ties: 5, awards: 47 },
-  { number: 2614, name: "Phoenixes", city: "Phoenix", state: "AZ", country: "USA", rookie_year: 2008, motto: "Rise from the ashes", wins: 187, losses: 225, ties: 2, awards: 38 },
-];
+// Teams are loaded at runtime from Statbotics via TeamsContext.
+// This empty array is kept so existing imports don't break during the transition.
+export const teams: Team[] = [];
 
 export const events: Event[] = [
   {

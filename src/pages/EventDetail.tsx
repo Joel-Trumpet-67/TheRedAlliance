@@ -1,9 +1,10 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { events, getMatchesForEvent, getRankingsForEvent, teams } from '../data/mockData';
+import { events, getMatchesForEvent, getRankingsForEvent } from '../data/mockData';
 import { MatchRow } from '../components/MatchRow';
 import { useMemo, useState } from 'react';
 import { usePageEntrance } from '../hooks/usePageEntrance';
 import { useStagger } from '../hooks/useStagger';
+import { useTeams } from '../context/TeamsContext';
 
 type Tab = 'matches' | 'rankings' | 'teams';
 
@@ -26,10 +27,11 @@ function badgeClass(type: string) {
 }
 
 export function EventDetail() {
-  const { key } = useParams<{ key: string }>();
-  const navigate = useNavigate();
+  const { key }    = useParams<{ key: string }>();
+  const navigate   = useNavigate();
   const [tab, setTab] = useState<Tab>('matches');
-  const pageRef = usePageEntrance();
+  const pageRef    = usePageEntrance();
+  const { teams }  = useTeams();
 
   const event    = events.find(e => e.key === key);
   const matches  = useMemo(() => key ? getMatchesForEvent(key) : [], [key]);
@@ -46,15 +48,21 @@ export function EventDetail() {
           <button
             onClick={() => navigate('/events')}
             style={{ marginTop: '1rem', color: 'var(--red-400)', fontSize: '0.9rem' }}
-          >
-            ← Back to Events
-          </button>
+          >← Back to Events</button>
         </div>
       </div>
     );
   }
 
-  const eventTeams = teams.filter(t => event.teams.includes(t.number));
+  // Look up team objects from the live teams list; fall back to number-only stubs
+  const eventTeams = event.teams.map(num => {
+    const found = teams.find(t => t.number === num);
+    return found ?? {
+      number: num, name: `Team ${num}`, city: '', state: '', country: '',
+      rookie_year: 0, motto: '', wins: 0, losses: 0, ties: 0, awards: 0,
+    };
+  });
+
   const quals    = matches.filter(m => m.comp_level === 'qm');
   const playoffs = matches.filter(m => m.comp_level !== 'qm');
 
@@ -97,17 +105,13 @@ export function EventDetail() {
           {quals.length > 0 && (
             <div style={{ marginBottom: '1rem' }}>
               <div className="section-title" style={{ marginBottom: '0.4rem' }}>Qualification Matches</div>
-              <div className="card">
-                {quals.map(m => <MatchRow key={m.key} match={m} />)}
-              </div>
+              <div className="card">{quals.map(m => <MatchRow key={m.key} match={m} />)}</div>
             </div>
           )}
           {playoffs.length > 0 && (
             <div>
               <div className="section-title" style={{ marginBottom: '0.4rem' }}>Playoff Matches</div>
-              <div className="card">
-                {playoffs.map(m => <MatchRow key={m.key} match={m} />)}
-              </div>
+              <div className="card">{playoffs.map(m => <MatchRow key={m.key} match={m} />)}</div>
             </div>
           )}
           {matches.length === 0 && (
@@ -154,31 +158,26 @@ export function EventDetail() {
       )}
 
       {tab === 'teams' && (
-        eventTeams.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">🤖</div>
-            <div>No team data available</div>
-          </div>
-        ) : (
-          <div className="card-list" ref={teamsRef}>
-            {eventTeams.sort((a, b) => a.number - b.number).map(t => (
-              <div className="card" key={t.number}>
-                <Link to={`/teams/${t.number}`} className="card-link">
-                  <div className="team-card">
-                    <div className="team-number-badge">{t.number}</div>
-                    <div className="team-info">
-                      <div className="team-name">{t.name}</div>
-                      <div className="team-location">{t.city}, {t.state}</div>
-                    </div>
-                    <div className="record-text" style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-                      {t.wins}-{t.losses}
+        <div className="card-list" ref={teamsRef}>
+          {eventTeams.sort((a, b) => a.number - b.number).map(t => (
+            <div className="card" key={t.number}>
+              <Link to={`/teams/${t.number}`} className="card-link">
+                <div className="team-card">
+                  <div className="team-number-badge">{t.number}</div>
+                  <div className="team-info">
+                    <div className="team-name">{t.name}</div>
+                    <div className="team-location">
+                      {[t.city, t.state].filter(Boolean).join(', ')}
                     </div>
                   </div>
-                </Link>
-              </div>
-            ))}
-          </div>
-        )
+                  <div className="record-text" style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+                    {t.wins}-{t.losses}
+                  </div>
+                </div>
+              </Link>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
