@@ -2,18 +2,40 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { events, getMatchesForEvent, getRankingsForEvent, teams } from '../data/mockData';
 import { MatchRow } from '../components/MatchRow';
 import { useMemo, useState } from 'react';
+import { usePageEntrance } from '../hooks/usePageEntrance';
+import { useStagger } from '../hooks/useStagger';
 
 type Tab = 'matches' | 'rankings' | 'teams';
+
+function formatDate(start: string, end: string) {
+  const s = new Date(start + 'T12:00:00');
+  const e = new Date(end + 'T12:00:00');
+  const opts: Intl.DateTimeFormatOptions = { month: 'long', day: 'numeric' };
+  if (s.getMonth() === e.getMonth()) {
+    return `${s.toLocaleDateString('en-US', opts)} – ${e.getDate()}, ${e.getFullYear()}`;
+  }
+  return `${s.toLocaleDateString('en-US', opts)} – ${e.toLocaleDateString('en-US', opts)}, ${e.getFullYear()}`;
+}
+
+function badgeClass(type: string) {
+  const t = type.toLowerCase();
+  if (t.includes('district championship')) return 'district-championship';
+  if (t.includes('championship')) return 'championship';
+  if (t.includes('district'))     return 'district';
+  return 'regional';
+}
 
 export function EventDetail() {
   const { key } = useParams<{ key: string }>();
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('matches');
+  const pageRef = usePageEntrance();
 
-  const event = events.find(e => e.key === key);
-
-  const matches = useMemo(() => key ? getMatchesForEvent(key) : [], [key]);
+  const event    = events.find(e => e.key === key);
+  const matches  = useMemo(() => key ? getMatchesForEvent(key) : [], [key]);
   const rankings = useMemo(() => key ? getRankingsForEvent(key) : [], [key]);
+
+  const teamsRef = useStagger<HTMLDivElement>([tab]);
 
   if (!event) {
     return (
@@ -33,36 +55,20 @@ export function EventDetail() {
   }
 
   const eventTeams = teams.filter(t => event.teams.includes(t.number));
-
-  function formatDate(start: string, end: string) {
-    const s = new Date(start + 'T12:00:00');
-    const e = new Date(end + 'T12:00:00');
-    const opts: Intl.DateTimeFormatOptions = { month: 'long', day: 'numeric' };
-    if (s.getMonth() === e.getMonth()) {
-      return `${s.toLocaleDateString('en-US', opts)} – ${e.getDate()}, ${e.getFullYear()}`;
-    }
-    return `${s.toLocaleDateString('en-US', { ...opts })} – ${e.toLocaleDateString('en-US', { ...opts })}, ${e.getFullYear()}`;
-  }
-
-  const quals = matches.filter(m => m.comp_level === 'qm');
+  const quals    = matches.filter(m => m.comp_level === 'qm');
   const playoffs = matches.filter(m => m.comp_level !== 'qm');
 
   return (
-    <div className="page">
+    <div className="page" ref={pageRef}>
       <Link to="/events" className="back-btn">← Events</Link>
 
       <div className="detail-header">
-        <span
-          className={`event-badge ${event.event_type.toLowerCase().includes('championship') ? 'championship' : event.event_type.toLowerCase().includes('district') ? 'district' : 'regional'}`}
-          style={{ marginBottom: '0.5rem', display: 'inline-block' }}
-        >
+        <span className={`event-badge ${badgeClass(event.event_type)}`} style={{ marginBottom: '0.5rem', display: 'inline-block' }}>
           {event.event_type}
         </span>
         <div className="detail-title">{event.name}</div>
         <div className="detail-subtitle">{event.city}, {event.state}, {event.country}</div>
-        <div className="detail-subtitle" style={{ marginTop: 4 }}>
-          {formatDate(event.start_date, event.end_date)}
-        </div>
+        <div className="detail-subtitle" style={{ marginTop: 4 }}>{formatDate(event.start_date, event.end_date)}</div>
 
         <div className="stat-row">
           <div className="stat-chip">
@@ -81,15 +87,9 @@ export function EventDetail() {
       </div>
 
       <div className="tabs">
-        <button className={`tab-btn${tab === 'matches' ? ' active' : ''}`} onClick={() => setTab('matches')}>
-          Matches
-        </button>
-        <button className={`tab-btn${tab === 'rankings' ? ' active' : ''}`} onClick={() => setTab('rankings')}>
-          Rankings
-        </button>
-        <button className={`tab-btn${tab === 'teams' ? ' active' : ''}`} onClick={() => setTab('teams')}>
-          Teams
-        </button>
+        <button className={`tab-btn${tab === 'matches'  ? ' active' : ''}`} onClick={() => setTab('matches')}>Matches</button>
+        <button className={`tab-btn${tab === 'rankings' ? ' active' : ''}`} onClick={() => setTab('rankings')}>Rankings</button>
+        <button className={`tab-btn${tab === 'teams'    ? ' active' : ''}`} onClick={() => setTab('teams')}>Teams</button>
       </div>
 
       {tab === 'matches' && (
@@ -141,14 +141,8 @@ export function EventDetail() {
                 {rankings.map(r => (
                   <tr key={r.team_number}>
                     <td className="rank-num">{r.rank}</td>
-                    <td>
-                      <Link to={`/teams/${r.team_number}`} className="team-link">
-                        {r.team_number}
-                      </Link>
-                    </td>
-                    <td style={{ color: 'var(--text-secondary)' }}>
-                      {r.wins}-{r.losses}-{r.ties}
-                    </td>
+                    <td><Link to={`/teams/${r.team_number}`} className="team-link">{r.team_number}</Link></td>
+                    <td style={{ color: 'var(--text-secondary)' }}>{r.wins}-{r.losses}-{r.ties}</td>
                     <td style={{ fontWeight: 600 }}>{r.rp}</td>
                     <td style={{ color: 'var(--text-secondary)' }}>{r.avg_score}</td>
                   </tr>
@@ -166,7 +160,7 @@ export function EventDetail() {
             <div>No team data available</div>
           </div>
         ) : (
-          <div className="card-list">
+          <div className="card-list" ref={teamsRef}>
             {eventTeams.sort((a, b) => a.number - b.number).map(t => (
               <div className="card" key={t.number}>
                 <Link to={`/teams/${t.number}`} className="card-link">

@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { teams } from '../data/mockData';
 import { TeamCard } from '../components/TeamCard';
+import { usePageEntrance } from '../hooks/usePageEntrance';
+import { useStagger } from '../hooks/useStagger';
 
 type SortKey = 'number' | 'wins' | 'awards';
 
 export function Teams() {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortKey>('wins');
+  const pageRef = usePageEntrance();
 
   const filtered = teams
     .filter(t => {
@@ -21,12 +24,14 @@ export function Teams() {
     })
     .sort((a, b) => {
       if (sort === 'number') return a.number - b.number;
-      if (sort === 'wins') return b.wins - a.wins;
+      if (sort === 'wins')   return b.wins - a.wins;
       return b.awards - a.awards;
     });
 
+  const listRef = useStagger<HTMLDivElement>([filtered.length, sort, query]);
+
   return (
-    <div className="page">
+    <div className="page" ref={pageRef}>
       <h1 className="page-title">Teams</h1>
 
       <div className="search-bar">
@@ -45,15 +50,9 @@ export function Teams() {
       </div>
 
       <div className="tabs" style={{ marginBottom: '1rem' }}>
-        <button className={`tab-btn${sort === 'wins' ? ' active' : ''}`} onClick={() => setSort('wins')}>
-          By Wins
-        </button>
-        <button className={`tab-btn${sort === 'awards' ? ' active' : ''}`} onClick={() => setSort('awards')}>
-          By Awards
-        </button>
-        <button className={`tab-btn${sort === 'number' ? ' active' : ''}`} onClick={() => setSort('number')}>
-          By Number
-        </button>
+        <button className={`tab-btn${sort === 'wins'   ? ' active' : ''}`} onClick={() => setSort('wins')}>By Wins</button>
+        <button className={`tab-btn${sort === 'awards' ? ' active' : ''}`} onClick={() => setSort('awards')}>By Awards</button>
+        <button className={`tab-btn${sort === 'number' ? ' active' : ''}`} onClick={() => setSort('number')}>By Number</button>
       </div>
 
       {filtered.length === 0 ? (
@@ -62,7 +61,7 @@ export function Teams() {
           <div>No teams found for "{query}"</div>
         </div>
       ) : (
-        <div className="card-list">
+        <div className="card-list" ref={listRef}>
           {filtered.map(t => <TeamCard key={t.number} team={t} />)}
         </div>
       )}

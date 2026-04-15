@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { events } from '../data/mockData';
 import { EventCard } from '../components/EventCard';
+import { usePageEntrance } from '../hooks/usePageEntrance';
+import { useStagger } from '../hooks/useStagger';
 
 type FilterType = 'all' | 'regional' | 'district' | 'championship';
 
 export function Events() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
+  const pageRef = usePageEntrance();
 
   const filtered = events.filter(e => {
     const q = query.toLowerCase();
@@ -18,15 +21,17 @@ export function Events() {
     const t = e.event_type.toLowerCase();
     const matchesFilter =
       filter === 'all' ||
-      (filter === 'regional' && t === 'regional') ||
-      (filter === 'district' && (t === 'district' || t === 'district championship')) ||
+      (filter === 'regional'     && t === 'regional') ||
+      (filter === 'district'     && (t === 'district' || t === 'district championship')) ||
       (filter === 'championship' && t === 'championship');
 
     return matchesQuery && matchesFilter;
   }).sort((a, b) => a.start_date.localeCompare(b.start_date));
 
+  const listRef = useStagger<HTMLDivElement>([filtered.length, filter, query]);
+
   return (
-    <div className="page">
+    <div className="page" ref={pageRef}>
       <h1 className="page-title">Events</h1>
 
       <div className="search-bar">
@@ -62,7 +67,7 @@ export function Events() {
           <div>No events found</div>
         </div>
       ) : (
-        <div className="card-list">
+        <div className="card-list" ref={listRef}>
           {filtered.map(e => <EventCard key={e.key} event={e} />)}
         </div>
       )}
