@@ -1,16 +1,18 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { events, getMatchesForEvent, getRankingsForEvent } from '../data/mockData';
+import { getMatchesForEvent, getRankingsForEvent } from '../data/mockData';
 import { MatchRow } from '../components/MatchRow';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usePageEntrance } from '../hooks/usePageEntrance';
 import { useStagger } from '../hooks/useStagger';
 import { useTeams } from '../context/TeamsContext';
+import { useEvents } from '../context/EventsContext';
+import { fetchTeamNumbersForEvent } from '../api/statbotics';
 
 type Tab = 'matches' | 'rankings' | 'teams';
 
 function formatDate(start: string, end: string) {
   const s = new Date(start + 'T12:00:00');
-  const e = new Date(end + 'T12:00:00');
+  const e = new Date(end   + 'T12:00:00');
   const opts: Intl.DateTimeFormatOptions = { month: 'long', day: 'numeric' };
   if (s.getMonth() === e.getMonth()) {
     return `${s.toLocaleDateString('en-US', opts)} – ${e.getDate()}, ${e.getFullYear()}`;
@@ -20,24 +22,59 @@ function formatDate(start: string, end: string) {
 
 function badgeClass(type: string) {
   const t = type.toLowerCase();
+  if (t.includes('einstein'))              return 'championship';
   if (t.includes('district championship')) return 'district-championship';
-  if (t.includes('championship')) return 'championship';
-  if (t.includes('district'))     return 'district';
+  if (t.includes('championship'))          return 'championship';
+  if (t.includes('district'))              return 'district';
   return 'regional';
 }
 
 export function EventDetail() {
-  const { key }    = useParams<{ key: string }>();
-  const navigate   = useNavigate();
+  const { key }     = useParams<{ key: string }>();
+  const navigate    = useNavigate();
   const [tab, setTab] = useState<Tab>('matches');
-  const pageRef    = usePageEntrance();
-  const { teams }  = useTeams();
+  const pageRef     = usePageEntrance();
+  const { teams }   = useTeams();
+  const { events, loading: eventsLoading } = useEvents();
+
+  // Lazy-loaded team numbers for this event
+  const [eventTeamNums,    setEventTeamNums]    = useState<number[]>([]);
+  const [teamsLoading,     setTeamsLoading]      = useState(false);
 
   const event    = events.find(e => e.key === key);
   const matches  = useMemo(() => key ? getMatchesForEvent(key) : [], [key]);
   const rankings = useMemo(() => key ? getRankingsForEvent(key) : [], [key]);
 
-  const teamsRef = useStagger<HTMLDivElement>([tab]);
+  // Fetch team numbers when Teams tab is first opened
+  useEffect(() => {
+    if (tab !== 'teams' || !key || eventTeamNums.length > 0 || teamsLoading) return;
+    setTeamsLoading(true);
+    fetchTeamNumbersForEvent(key).then(nums => {
+      setEventTeamNums(nums.sort((a, b) => a - b));
+      setTeamsLoading(false);
+    });
+  }, [tab, key, eventTeamNums.length, teamsLoading]);
+
+  const teamsRef = useStagger<HTMLDivElement>([tab, eventTeamNums.length]);
+
+  // Still loading events list
+  if (eventsLoading && !event) {
+    return (
+      <div className="page">
+        <div className="skeleton skeleton-line" style={{ width: 80, height: 14, marginBottom: '1rem' }} />
+        <div className="card" style={{ padding: '1.4rem 1.25rem', marginBottom: '1.25rem' }}>
+          <div className="skeleton skeleton-line" style={{ width: '25%', marginBottom: 8 }} />
+          <div className="skeleton skeleton-line" style={{ width: '70%', height: 22, marginBottom: 6 }} />
+          <div className="skeleton skeleton-line" style={{ width: '40%' }} />
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.85rem' }}>
+            {[60, 80, 80].map((w, i) => (
+              <div key={i} className="skeleton" style={{ width: w, height: 52, borderRadius: 9 }} />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!event) {
     return (
@@ -54,8 +91,8 @@ export function EventDetail() {
     );
   }
 
-  // Look up team objects from the live teams list; fall back to number-only stubs
-  const eventTeams = event.teams.map(num => {
+  // Resolve full team objects for the teams tab
+  const eventTeams = eventTeamNums.map(num => {
     const found = teams.find(t => t.number === num);
     return found ?? {
       number: num, name: `Team ${num}`, city: '', state: '', country: '',
@@ -65,31 +102,60 @@ export function EventDetail() {
 
   const quals    = matches.filter(m => m.comp_level === 'qm');
   const playoffs = matches.filter(m => m.comp_level !== 'qm');
+  const teamCount = event.num_teams ?? eventTeamNums.length;
+  const location  = [event.state, event.country].filter(Boolean).join(', ');
 
   return (
     <div className="page" ref={pageRef}>
       <Link to="/events" className="back-btn">← Events</Link>
 
       <div className="detail-header">
-        <span className={`event-badge ${badgeClass(event.event_type)}`} style={{ marginBottom: '0.5rem', display: 'inline-block' }}>
-          {event.event_type}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+          <span className={`event-badge ${badgeClass(event.event_type)}`}>
+            {event.event_type}
+          </span>
+          {event.status && event.status !== 'Completed' && (
+            <span style={{
+              fontSize: '0.72rem', fontWeight: 600, padding: '0.15rem 0.5rem',
+              borderRadius: 6,
+              background: event.status === 'In Progress' ? 'rgba(74,222,128,0.12)' : 'rgba(250,204,21,0.12)',
+              color: event.status === 'In Progress' ? '#4ade80' : '#facc15',
+              border: `1px solid ${event.status === 'In Progress' ? 'rgba(74,222,128,0.3)' : 'rgba(250,204,21,0.3)'}`,
+            }}>
+              {event.status}
+            </span>
+          )}
+        </div>
         <div className="detail-title">{event.name}</div>
-        <div className="detail-subtitle">{event.city}, {event.state}, {event.country}</div>
-        <div className="detail-subtitle" style={{ marginTop: 4 }}>{formatDate(event.start_date, event.end_date)}</div>
+        <div className="detail-subtitle">{location}</div>
+        <div className="detail-subtitle" style={{ marginTop: 4 }}>
+          {formatDate(event.start_date, event.end_date)}
+          {event.week != null && <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>Week {event.week}</span>}
+        </div>
+        {event.video && (
+          <a
+            href={event.video}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginTop: 8,
+              fontSize: '0.8rem', color: 'var(--red-400)', textDecoration: 'none' }}
+          >
+            ▶ Watch stream
+          </a>
+        )}
 
         <div className="stat-row">
           <div className="stat-chip">
             <div className="stat-chip-label">Teams</div>
-            <div className="stat-chip-value">{event.teams.length}</div>
+            <div className="stat-chip-value">{teamCount || '—'}</div>
           </div>
           <div className="stat-chip">
             <div className="stat-chip-label">Qual Matches</div>
-            <div className="stat-chip-value">{quals.length}</div>
+            <div className="stat-chip-value">{quals.length || '—'}</div>
           </div>
           <div className="stat-chip">
             <div className="stat-chip-label">Playoff Matches</div>
-            <div className="stat-chip-value">{playoffs.length}</div>
+            <div className="stat-chip-value">{playoffs.length || '—'}</div>
           </div>
         </div>
       </div>
@@ -97,7 +163,9 @@ export function EventDetail() {
       <div className="tabs">
         <button className={`tab-btn${tab === 'matches'  ? ' active' : ''}`} onClick={() => setTab('matches')}>Matches</button>
         <button className={`tab-btn${tab === 'rankings' ? ' active' : ''}`} onClick={() => setTab('rankings')}>Rankings</button>
-        <button className={`tab-btn${tab === 'teams'    ? ' active' : ''}`} onClick={() => setTab('teams')}>Teams</button>
+        <button className={`tab-btn${tab === 'teams'    ? ' active' : ''}`} onClick={() => setTab('teams')}>
+          Teams{teamCount ? ` (${teamCount})` : ''}
+        </button>
       </div>
 
       {tab === 'matches' && (
@@ -117,7 +185,7 @@ export function EventDetail() {
           {matches.length === 0 && (
             <div className="empty-state">
               <div className="empty-icon">⚙️</div>
-              <div>No matches scheduled yet</div>
+              <div>Match data not available</div>
             </div>
           )}
         </>
@@ -127,7 +195,7 @@ export function EventDetail() {
         rankings.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">📊</div>
-            <div>Rankings not available yet</div>
+            <div>Rankings not available</div>
           </div>
         ) : (
           <div className="card">
@@ -158,26 +226,47 @@ export function EventDetail() {
       )}
 
       {tab === 'teams' && (
-        <div className="card-list" ref={teamsRef}>
-          {eventTeams.sort((a, b) => a.number - b.number).map(t => (
-            <div className="card" key={t.number}>
-              <Link to={`/teams/${t.number}`} className="card-link">
+        teamsLoading ? (
+          <div className="card-list">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="card skeleton-card">
                 <div className="team-card">
-                  <div className="team-number-badge">{t.number}</div>
-                  <div className="team-info">
-                    <div className="team-name">{t.name}</div>
-                    <div className="team-location">
-                      {[t.city, t.state].filter(Boolean).join(', ')}
-                    </div>
-                  </div>
-                  <div className="record-text" style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-                    {t.wins}-{t.losses}
+                  <div className="skeleton skeleton-badge" />
+                  <div style={{ flex: 1 }}>
+                    <div className="skeleton skeleton-line" style={{ width: '50%' }} />
+                    <div className="skeleton skeleton-line" style={{ width: '35%', marginTop: 6 }} />
                   </div>
                 </div>
-              </Link>
-            </div>
-          ))}
-        </div>
+              </div>
+            ))}
+          </div>
+        ) : eventTeams.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">🤖</div>
+            <div>Team list not available</div>
+          </div>
+        ) : (
+          <div className="card-list" ref={teamsRef}>
+            {eventTeams.map(t => (
+              <div className="card" key={t.number}>
+                <Link to={`/teams/${t.number}`} className="card-link">
+                  <div className="team-card">
+                    <div className="team-number-badge">{t.number}</div>
+                    <div className="team-info">
+                      <div className="team-name">{t.name}</div>
+                      <div className="team-location">
+                        {[t.city, t.state].filter(Boolean).join(', ')}
+                      </div>
+                    </div>
+                    <div className="record-text" style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+                      {t.wins}-{t.losses}
+                    </div>
+                  </div>
+                </Link>
+              </div>
+            ))}
+          </div>
+        )
       )}
     </div>
   );

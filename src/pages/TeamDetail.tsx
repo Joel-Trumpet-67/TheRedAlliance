@@ -1,12 +1,44 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getTeamEvents, getMatchesForEvent } from '../data/mockData';
+import { getMatchesForEvent } from '../data/mockData';
 import { EventCard } from '../components/EventCard';
 import { MatchRow } from '../components/MatchRow';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usePageEntrance } from '../hooks/usePageEntrance';
 import { useStagger } from '../hooks/useStagger';
 import { useCountUp } from '../hooks/useCountUp';
 import { useTeams } from '../context/TeamsContext';
+import { fetchTeamEvents, SBTeamEvent } from '../api/statbotics';
+import type { Event } from '../data/mockData';
+
+function adaptSBTeamEvent(sb: SBTeamEvent): Event {
+  const typeMap: Record<string, string> = {
+    regional:     'Regional',
+    district:     'District',
+    district_cmp: 'District Championship',
+    champs_div:   'Championship Division',
+    einstein:     'Einstein Championship',
+  };
+  return {
+    key:        sb.event,
+    name:       sb.event_name,
+    short_name: sb.event_name
+      .replace(/ Regional$/, '')
+      .replace(/ District$/, '')
+      .replace(/ Championship.*/, ''),
+    city:       '',
+    state:      sb.state    ?? '',
+    country:    sb.country  ?? '',
+    start_date: sb.start_date ?? '',
+    end_date:   sb.end_date   ?? '',
+    event_type: typeMap[sb.type] ?? sb.type,
+    week:       sb.week,
+    year:       sb.year,
+    teams:      [],
+    status:     sb.status,
+  };
+}
+
+const YEARS = [2025, 2024, 2023, 2022, 2019, 2018];
 
 function StatChip({ label, value, color }: { label: string; value: number; color?: string }) {
   const counted = useCountUp(value, 900);
@@ -22,12 +54,30 @@ export function TeamDetail() {
   const { number }  = useParams<{ number: string }>();
   const navigate    = useNavigate();
   const [tab, setTab] = useState<'events' | 'matches'>('events');
+  const [evYear, setEvYear] = useState(2025);
   const pageRef     = usePageEntrance();
   const { teams, loading } = useTeams();
 
   const team = teams.find(t => t.number === Number(number));
 
-  const teamEvents  = team ? getTeamEvents(team.number) : [];
+  // Async team events
+  const [teamEvents,    setTeamEvents]    = useState<Event[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!team) return;
+    setEventsLoading(true);
+    setTeamEvents([]);
+    fetchTeamEvents(team.number, evYear).then(data => {
+      setTeamEvents(
+        data
+          .map(adaptSBTeamEvent)
+          .sort((a, b) => (a.week ?? 99) - (b.week ?? 99))
+      );
+      setEventsLoading(false);
+    });
+  }, [team?.number, evYear]);
+
   const teamMatches = useMemo(() => {
     if (!team) return [];
     return teamEvents.flatMap(e => {
@@ -38,10 +88,10 @@ export function TeamDetail() {
     });
   }, [teamEvents, team]);
 
-  const eventsRef  = useStagger<HTMLDivElement>([tab, team?.number]);
+  const eventsRef  = useStagger<HTMLDivElement>([tab, team?.number, evYear, eventsLoading]);
   const matchesRef = useStagger<HTMLDivElement>([tab, team?.number]);
 
-  /* Still fetching */
+  /* Still fetching teams list */
   if (loading && !team) {
     return (
       <div className="page">
@@ -119,7 +169,7 @@ export function TeamDetail() {
 
       <div className="tabs">
         <button className={`tab-btn${tab === 'events'  ? ' active' : ''}`} onClick={() => setTab('events')}>
-          Events ({teamEvents.length})
+          Events
         </button>
         <button className={`tab-btn${tab === 'matches' ? ' active' : ''}`} onClick={() => setTab('matches')}>
           Matches ({teamMatches.length})
@@ -127,16 +177,44 @@ export function TeamDetail() {
       </div>
 
       {tab === 'events' && (
-        teamEvents.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">📅</div>
-            <div>No events on record</div>
+        <>
+          {/* Year selector */}
+          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+            {YEARS.map(y => (
+              <button
+                key={y}
+                className={`tab-btn${evYear === y ? ' active' : ''}`}
+                style={{ fontSize: '0.78rem', padding: '0.3rem 0.7rem' }}
+                onClick={() => setEvYear(y)}
+              >
+                {y}
+              </button>
+            ))}
           </div>
-        ) : (
-          <div className="card-list" ref={eventsRef}>
-            {teamEvents.map(e => <EventCard key={e.key} event={e} />)}
-          </div>
-        )
+
+          {eventsLoading ? (
+            <div className="card-list">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="card skeleton-card">
+                  <div style={{ padding: '0.9rem 1rem' }}>
+                    <div className="skeleton skeleton-line" style={{ width: '25%', marginBottom: 8 }} />
+                    <div className="skeleton skeleton-line" style={{ width: '65%', height: 18, marginBottom: 6 }} />
+                    <div className="skeleton skeleton-line" style={{ width: '40%' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : teamEvents.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">📅</div>
+              <div>No events in {evYear}</div>
+            </div>
+          ) : (
+            <div className="card-list" ref={eventsRef}>
+              {teamEvents.map(e => <EventCard key={e.key} event={e} />)}
+            </div>
+          )}
+        </>
       )}
 
       {tab === 'matches' && (

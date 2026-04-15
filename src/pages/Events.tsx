@@ -1,38 +1,64 @@
 import { useState } from 'react';
-import { events } from '../data/mockData';
+import { useEvents } from '../context/EventsContext';
 import { EventCard } from '../components/EventCard';
 import { usePageEntrance } from '../hooks/usePageEntrance';
 import { useStagger } from '../hooks/useStagger';
 
 type FilterType = 'all' | 'regional' | 'district' | 'championship';
 
+const YEARS = [2025, 2024, 2023, 2022, 2019, 2018];
+
 export function Events() {
-  const [query, setQuery] = useState('');
+  const [query,  setQuery]  = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
+  const { events, loading, year, setYear } = useEvents();
   const pageRef = usePageEntrance();
 
   const filtered = events.filter(e => {
     const q = query.toLowerCase();
     const matchesQuery = !q ||
       e.name.toLowerCase().includes(q) ||
-      e.city.toLowerCase().includes(q) ||
-      e.state.toLowerCase().includes(q);
+      e.state.toLowerCase().includes(q) ||
+      e.country.toLowerCase().includes(q);
 
     const t = e.event_type.toLowerCase();
     const matchesFilter =
       filter === 'all' ||
       (filter === 'regional'     && t === 'regional') ||
       (filter === 'district'     && (t === 'district' || t === 'district championship')) ||
-      (filter === 'championship' && t === 'championship');
+      (filter === 'championship' && (t.includes('championship') || t.includes('einstein')));
 
     return matchesQuery && matchesFilter;
-  }).sort((a, b) => a.start_date.localeCompare(b.start_date));
+  });
 
-  const listRef = useStagger<HTMLDivElement>([filtered.length, filter, query]);
+  const listRef = useStagger<HTMLDivElement>([loading, filter, query, year]);
 
   return (
     <div className="page" ref={pageRef}>
-      <h1 className="page-title">Events</h1>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', marginBottom: '1.25rem' }}>
+        <h1 className="page-title" style={{ margin: 0 }}>Events</h1>
+        {loading ? (
+          <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Loading…</span>
+        ) : (
+          <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+            {filtered.length} of {events.length}
+          </span>
+        )}
+      </div>
+
+      {/* Year selector */}
+      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        {YEARS.map(y => (
+          <button
+            key={y}
+            className={`tab-btn${year === y ? ' active' : ''}`}
+            style={{ fontSize: '0.78rem', padding: '0.3rem 0.7rem' }}
+            onClick={() => setYear(y)}
+          >
+            {y}
+          </button>
+        ))}
+      </div>
 
       <div className="search-bar">
         <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -42,7 +68,7 @@ export function Events() {
         <input
           className="search-input"
           type="search"
-          placeholder="Search events…"
+          placeholder="Search by name or state…"
           value={query}
           onChange={e => setQuery(e.target.value)}
           autoComplete="off"
@@ -61,7 +87,19 @@ export function Events() {
         ))}
       </div>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="card-list">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div key={i} className="card skeleton-card">
+              <div style={{ padding: '0.9rem 1rem' }}>
+                <div className="skeleton skeleton-line" style={{ width: '25%', marginBottom: 8 }} />
+                <div className="skeleton skeleton-line" style={{ width: '65%', height: 18, marginBottom: 6 }} />
+                <div className="skeleton skeleton-line" style={{ width: '40%' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">📅</div>
           <div>No events found</div>

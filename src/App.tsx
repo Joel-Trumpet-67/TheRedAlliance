@@ -6,10 +6,12 @@ import { TeamDetail } from './pages/TeamDetail';
 import { Events } from './pages/Events';
 import { EventDetail } from './pages/EventDetail';
 import { TeamsProvider } from './context/TeamsContext';
+import { EventsProvider } from './context/EventsContext';
 
 export default function App() {
   return (
     <TeamsProvider>
+    <EventsProvider>
       <BrowserRouter>
         <Navbar />
         <Routes>
@@ -22,6 +24,7 @@ export default function App() {
         </Routes>
         <BottomNav />
       </BrowserRouter>
+    </EventsProvider>
     </TeamsProvider>
   );
 }

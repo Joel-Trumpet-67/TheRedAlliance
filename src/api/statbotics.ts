@@ -23,6 +23,46 @@ export interface SBTeam {
   };
 }
 
+// ─── Event interfaces ────────────────────────────────────────────────────────
+
+/** Raw shape returned by Statbotics /v3/events */
+export interface SBEvent {
+  key: string;
+  year: number;
+  name: string;
+  time: number;
+  country: string | null;
+  state: string | null;
+  district: string | null;
+  start_date: string;
+  end_date: string;
+  type: string;   // 'regional' | 'district' | 'district_cmp' | 'champs_div' | 'einstein'
+  week: number | null;
+  video: string | null;
+  status: string; // 'Upcoming' | 'In Progress' | 'Completed'
+  status_str: string;
+  num_teams: number;
+  qual_matches: number;
+}
+
+/** Raw shape returned by Statbotics /v3/team_events */
+export interface SBTeamEvent {
+  team: number;
+  year: number;
+  event: string;
+  event_name: string;
+  type: string;
+  week: number | null;
+  status: string;
+  country: string | null;
+  state: string | null;
+  district: string | null;
+  start_date?: string;
+  end_date?: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const BASE      = 'https://api.statbotics.io/v3';
 const LIMIT     = 1000;           // max Statbotics allows per page
 const MAX_PAGES = 20;             // 20 × 1000 = 20 000 teams ceiling (plenty)
@@ -107,4 +147,69 @@ export async function fetchAllTeams(
   } catch { /* localStorage quota exceeded — skip caching */ }
 
   return allTeams;
+}
+
+// ─── Event fetchers ───────────────────────────────────────────────────────────
+
+const EVENT_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours (events change more often)
+
+/** Fetches all events for a given year, with 6-hour localStorage cache. */
+export async function fetchEventsForYear(year: number): Promise<SBEvent[]> {
+  const cacheKey = `sb_events_${year}`;
+  try {
+    const raw = localStorage.getItem(cacheKey);
+    if (raw) {
+      const { ts, data } = JSON.parse(raw) as { ts: number; data: SBEvent[] };
+      if (Date.now() - ts < EVENT_CACHE_TTL) return data;
+    }
+  } catch { /* corrupt — fall through */ }
+
+  const res = await fetch(`${BASE}/events?limit=500&year=${year}`, {
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Failed to load events for ${year}`);
+  const data: SBEvent[] = await res.json();
+
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data }));
+  } catch { /* quota */ }
+
+  return data;
+}
+
+/**
+ * Fetches the team numbers attending a specific event.
+ * Used by EventDetail to populate the Teams tab on demand.
+ */
+export async function fetchTeamNumbersForEvent(eventKey: string): Promise<number[]> {
+  try {
+    const res = await fetch(`${BASE}/team_events?event=${eventKey}&limit=200`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return [];
+    const data: SBTeamEvent[] = await res.json();
+    return data.map(t => t.team);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fetches the events a team attended in a given year (defaults to current year).
+ * Used by TeamDetail to list events and their matches.
+ */
+export async function fetchTeamEvents(
+  teamNumber: number,
+  year: number
+): Promise<SBTeamEvent[]> {
+  try {
+    const res = await fetch(
+      `${BASE}/team_events?team=${teamNumber}&year=${year}&limit=50`,
+      { headers: { Accept: 'application/json' } }
+    );
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
 }

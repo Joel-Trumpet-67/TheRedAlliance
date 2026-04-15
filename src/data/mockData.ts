@@ -41,6 +41,12 @@ export interface Event {
   week: number | null;
   year: number;
   teams: number[];
+  /** Total team count from API (teams array may be empty until lazy-loaded) */
+  num_teams?: number;
+  /** Event status from API: 'Upcoming' | 'In Progress' | 'Completed' */
+  status?: string;
+  /** Livestream URL */
+  video?: string;
 }
 
 export interface Ranking {
@@ -57,92 +63,9 @@ export interface Ranking {
 // This empty array is kept so existing imports don't break during the transition.
 export const teams: Team[] = [];
 
-export const events: Event[] = [
-  {
-    key: "2025casj",
-    name: "Silicon Valley Regional",
-    short_name: "Silicon Valley",
-    city: "San Jose",
-    state: "CA",
-    country: "USA",
-    start_date: "2025-03-13",
-    end_date: "2025-03-15",
-    event_type: "Regional",
-    week: 3,
-    year: 2025,
-    teams: [254, 1678, 4414, 971, 330, 3175, 2614, 4910, 7492, 3538, 6328, 2056],
-  },
-  {
-    key: "2025onca",
-    name: "Ontario Provincial Championship",
-    short_name: "Ontario Provincial",
-    city: "Mississauga",
-    state: "ON",
-    country: "Canada",
-    start_date: "2025-03-20",
-    end_date: "2025-03-22",
-    event_type: "District Championship",
-    week: 4,
-    year: 2025,
-    teams: [1114, 2056, 5406, 1241, 1619, 2910, 148, 118, 3310, 254, 1678],
-  },
-  {
-    key: "2025txda",
-    name: "Dallas Regional",
-    short_name: "Dallas",
-    city: "Dallas",
-    state: "TX",
-    country: "USA",
-    start_date: "2025-03-27",
-    end_date: "2025-03-29",
-    event_type: "Regional",
-    week: 5,
-    year: 2025,
-    teams: [118, 148, 3310, 4910, 254, 1678, 971, 330, 3538, 2614, 7492],
-  },
-  {
-    key: "2025new",
-    name: "New England District Championship",
-    short_name: "NE District Championship",
-    city: "Bridgeport",
-    state: "CT",
-    country: "USA",
-    start_date: "2025-04-10",
-    end_date: "2025-04-12",
-    event_type: "District Championship",
-    week: 6,
-    year: 2025,
-    teams: [1619, 6328, 4414, 254, 1114, 2910, 971, 3175],
-  },
-  {
-    key: "2025cmp",
-    name: "FIRST Championship — Houston",
-    short_name: "Championship",
-    city: "Houston",
-    state: "TX",
-    country: "USA",
-    start_date: "2025-04-16",
-    end_date: "2025-04-20",
-    event_type: "Championship",
-    week: null,
-    year: 2025,
-    teams: [254, 1114, 2056, 118, 1678, 3310, 4414, 6328, 148, 971, 1619, 330, 2910, 5406, 1241, 3538, 4910, 3175, 2614, 7492],
-  },
-  {
-    key: "2025wasp",
-    name: "PNW District Spokane Event",
-    short_name: "PNW Spokane",
-    city: "Spokane",
-    state: "WA",
-    country: "USA",
-    start_date: "2025-03-07",
-    end_date: "2025-03-09",
-    event_type: "District",
-    week: 2,
-    year: 2025,
-    teams: [2910, 3175, 7492, 4414, 971, 254],
-  },
-];
+// Events are loaded at runtime from Statbotics via EventsContext.
+// This empty array is kept so existing imports don't break.
+export const events: Event[] = [];
 
 export function getMatchesForEvent(eventKey: string): Match[] {
   const eventTeams = events.find(e => e.key === eventKey)?.teams ?? [];
