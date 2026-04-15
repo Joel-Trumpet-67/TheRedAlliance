@@ -2,44 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-
-    <!-- PWA / iOS home screen -->
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="RedAlliance" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
-    <link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167.png" />
-
-    <!-- iOS splash screens (portrait) -->
-    <link rel="apple-touch-startup-image"
-      href="/icons/splash-1170x2532.png"
-      media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" />
-    <link rel="apple-touch-startup-image"
-      href="/icons/splash-1284x2778.png"
-      media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)" />
-
-    <meta name="theme-color" content="#b91c1c" />
-    <meta name="description" content="FIRST Robotics Competition scores, team stats, and event results — The Red Alliance" />
-
-    <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
-    <title>The Red Alliance</title>
+    <title>Hello World</title>
   </head>
   <body>
-    <div id="root"></div>
-    <!-- Must run before any ES module so react-router can use crypto -->
-    <script>
-      if (typeof window.crypto === 'undefined') window.crypto = {};
-      if (typeof window.crypto.getRandomValues === 'undefined') {
-        window.crypto.getRandomValues = function(arr) {
-          for (var i = 0; i < arr.length; i++)
-            arr[i] = Math.floor(Math.random() * 256);
-          return arr;
-        };
-      }
-    </script>
-    <script type="module" src="/src/main.tsx"></script>
+    <h1>Hello World</h1>
   </body>
 </html>
