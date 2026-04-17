@@ -1,6 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import anime from 'animejs';
 import type { Match } from '../data/mockData';
 import type { SBMatch } from '../api/statbotics';
 
@@ -36,17 +35,15 @@ function RpRow({ label, redEarned, blueEarned }: {
 }
 
 export function MatchDetailModal({ match, sbMatch, onClose }: Props) {
-  const sheetRef = useRef<HTMLDivElement>(null);
+  const sheetRef   = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const [isOpen, setIsOpen] = useState(false);
 
-  // Animate in
+  // Open: trigger CSS transition on next frame so translateY(100%) is painted first
   useEffect(() => {
-    if (!match || !sheetRef.current) return;
-    anime({
-      targets: sheetRef.current,
-      translateY: ['100%', '0%'],
-      duration: 340,
-      easing: 'cubicBezier(0.32, 0.72, 0, 1)',
-    });
+    if (!match) return;
+    const raf = requestAnimationFrame(() => setIsOpen(true));
+    return () => cancelAnimationFrame(raf);
   }, [match]);
 
   if (!match) return null;
@@ -63,20 +60,14 @@ export function MatchDetailModal({ match, sbMatch, onClose }: Props) {
   const blueWon = match.winning_alliance === 'blue';
 
   function close() {
-    if (!sheetRef.current) { onClose(); return; }
-    anime({
-      targets: sheetRef.current,
-      translateY: ['0%', '100%'],
-      duration: 260,
-      easing: 'easeInQuad',
-      complete: onClose,
-    });
+    setIsOpen(false);
+    setTimeout(onClose, 320);
   }
 
   return (
     <>
-      <div className="modal-overlay" onClick={close} />
-      <div className="modal-sheet" ref={sheetRef} style={{ transform: 'translateY(100%)' }}>
+      <div ref={overlayRef} className="modal-overlay" onClick={close} />
+      <div ref={sheetRef} className={`modal-sheet${isOpen ? ' open' : ''}`}>
         <div className="modal-handle" />
 
         {/* Header */}
@@ -165,6 +156,32 @@ export function MatchDetailModal({ match, sbMatch, onClose }: Props) {
                   </div>
                 </>
               )}
+            </>
+          );
+        })()}
+
+        {/* Upcoming match — show predictions only */}
+        {!detail?.result && detail?.pred && (() => {
+          const pred = detail.pred!;
+          return (
+            <>
+              <div className="mbd-section-title">Predictions</div>
+              <div className="mbd-card">
+                <Row label="Predicted Score"
+                     red={pred.red_score.toFixed(1)}
+                     blue={pred.blue_score.toFixed(1)} />
+                <Row label="Win Probability"
+                     red={`${(pred.red_win_prob * 100).toFixed(0)}%`}
+                     blue={`${((1 - pred.red_win_prob) * 100).toFixed(0)}%`} />
+                <Row label="RP 1 Chance"
+                     red={`${(pred.red_rp_1 * 100).toFixed(0)}%`}
+                     blue={`${(pred.blue_rp_1 * 100).toFixed(0)}%`}
+                     redClass="muted" blueClass="muted" />
+                <Row label="RP 2 Chance"
+                     red={`${(pred.red_rp_2 * 100).toFixed(0)}%`}
+                     blue={`${(pred.blue_rp_2 * 100).toFixed(0)}%`}
+                     redClass="muted" blueClass="muted" />
+              </div>
             </>
           );
         })()}

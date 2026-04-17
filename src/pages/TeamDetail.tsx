@@ -1,14 +1,14 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getMatchesForEvent } from '../data/mockData';
 import { EventCard } from '../components/EventCard';
 import { MatchRow } from '../components/MatchRow';
-import { useEffect, useMemo, useState } from 'react';
+import { MatchDetailModal } from '../components/MatchDetailModal';
+import { useEffect, useState } from 'react';
 import { usePageEntrance } from '../hooks/usePageEntrance';
 import { useStagger } from '../hooks/useStagger';
 import { useCountUp } from '../hooks/useCountUp';
 import { useTeams } from '../context/TeamsContext';
-import { fetchTeamEvents, SBTeamEvent } from '../api/statbotics';
-import type { Event } from '../data/mockData';
+import { fetchTeamEvents, fetchEventMatches, adaptMatch, type SBTeamEvent, type SBMatch } from '../api/statbotics';
+import type { Event, Match } from '../data/mockData';
 
 function adaptSBTeamEvent(sb: SBTeamEvent): Event {
   const typeMap: Record<string, string> = {
@@ -64,6 +64,12 @@ export function TeamDetail() {
   const [teamEvents,    setTeamEvents]    = useState<Event[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
 
+  // Real matches fetched from Statbotics
+  const [matches,        setMatches]        = useState<Match[]>([]);
+  const [rawMatches,     setRawMatches]     = useState<SBMatch[]>([]);
+  const [matchesLoading, setMatchesLoading] = useState(false);
+  const [selectedMatch,  setSelectedMatch]  = useState<Match | null>(null);
+
   useEffect(() => {
     if (!team) return;
     setEventsLoading(true);
@@ -78,18 +84,34 @@ export function TeamDetail() {
     });
   }, [team?.number, evYear]);
 
-  const teamMatches = useMemo(() => {
-    if (!team) return [];
-    return teamEvents.flatMap(e => {
-      const matches = getMatchesForEvent(e.key);
-      return matches
-        .filter(m => m.red_alliance.includes(team.number) || m.blue_alliance.includes(team.number))
-        .map(m => ({ ...m, eventName: e.short_name }));
+  // Fetch real matches for all events this team attended
+  useEffect(() => {
+    if (!team || teamEvents.length === 0) { setMatches([]); setRawMatches([]); return; }
+    let cancelled = false;
+    setMatchesLoading(true);
+    Promise.all(teamEvents.map(e => fetchEventMatches(e.key))).then(results => {
+      if (cancelled) return;
+      const teamNum = team.number;
+      const allRaw = results.flat().filter(m =>
+        m.alliances?.red?.team_keys?.includes(teamNum) ||
+        m.alliances?.blue?.team_keys?.includes(teamNum)
+      ).sort((a, b) => {
+        if (a.event !== b.event) return a.event.localeCompare(b.event);
+        const lvl = ['qm', 'qf', 'sf', 'f'];
+        const li = lvl.indexOf(a.comp_level), lj = lvl.indexOf(b.comp_level);
+        if (li !== lj) return li - lj;
+        if (a.set_number !== b.set_number) return a.set_number - b.set_number;
+        return a.match_number - b.match_number;
+      });
+      setRawMatches(allRaw);
+      setMatches(allRaw.map(adaptMatch));
+      setMatchesLoading(false);
     });
-  }, [teamEvents, team]);
+    return () => { cancelled = true; };
+  }, [team?.number, teamEvents]);
 
   const eventsRef  = useStagger<HTMLDivElement>([tab, team?.number, evYear, eventsLoading]);
-  const matchesRef = useStagger<HTMLDivElement>([tab, team?.number]);
+  const matchesRef = useStagger<HTMLDivElement>([tab, team?.number, matches.length]);
 
   /* Still fetching teams list */
   if (loading && !team) {
@@ -131,6 +153,11 @@ export function TeamDetail() {
 
   return (
     <div className="page" ref={pageRef}>
+      <MatchDetailModal
+        match={selectedMatch}
+        sbMatch={selectedMatch ? (rawMatches.find(r => r.key === selectedMatch.key) ?? null) : null}
+        onClose={() => setSelectedMatch(null)}
+      />
       <Link to="/teams" className="back-btn">← Teams</Link>
 
       <div className="detail-header">
@@ -172,7 +199,7 @@ export function TeamDetail() {
           Events
         </button>
         <button className={`tab-btn${tab === 'matches' ? ' active' : ''}`} onClick={() => setTab('matches')}>
-          Matches ({teamMatches.length})
+          Matches ({matches.length})
         </button>
       </div>
 
@@ -218,14 +245,27 @@ export function TeamDetail() {
       )}
 
       {tab === 'matches' && (
-        teamMatches.length === 0 ? (
+        matchesLoading ? (
+          <div className="card">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="match-row">
+                <div className="skeleton skeleton-line" style={{ width: 28, height: 13 }} />
+                <div className="skeleton skeleton-line" style={{ width: '22%', height: 34 }} />
+                <div className="skeleton skeleton-line" style={{ width: 72, height: 28 }} />
+                <div className="skeleton skeleton-line" style={{ width: '22%', height: 34 }} />
+              </div>
+            ))}
+          </div>
+        ) : matches.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">🤖</div>
             <div>No matches on record</div>
           </div>
         ) : (
           <div className="card" ref={matchesRef}>
-            {teamMatches.map(m => <MatchRow key={m.key} match={m} highlightTeam={team.number} />)}
+            {matches.map(m => (
+              <MatchRow key={m.key} match={m} highlightTeam={team.number} onClick={setSelectedMatch} />
+            ))}
           </div>
         )
       )}
