@@ -1,12 +1,14 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getMatchesForEvent, getRankingsForEvent } from '../data/mockData';
+import { getRankingsForEvent, type Match } from '../data/mockData';
 import { MatchRow } from '../components/MatchRow';
+import { MatchDetailModal } from '../components/MatchDetailModal';
 import { useEffect, useMemo, useState } from 'react';
 import { usePageEntrance } from '../hooks/usePageEntrance';
 import { useStagger } from '../hooks/useStagger';
 import { useTeams } from '../context/TeamsContext';
 import { useEvents } from '../context/EventsContext';
-import { fetchTeamNumbersForEvent } from '../api/statbotics';
+import { usePinnedEvents } from '../context/PinnedEventsContext';
+import { fetchTeamNumbersForEvent, fetchEventMatches, adaptMatch } from '../api/statbotics';
 
 type Tab = 'matches' | 'rankings' | 'teams';
 
@@ -41,9 +43,34 @@ export function EventDetail() {
   const [eventTeamNums,    setEventTeamNums]    = useState<number[]>([]);
   const [teamsLoading,     setTeamsLoading]      = useState(false);
 
+  const { isPinned, toggle } = usePinnedEvents();
   const event    = events.find(e => e.key === key);
-  const matches  = useMemo(() => key ? getMatchesForEvent(key) : [], [key]);
   const rankings = useMemo(() => key ? getRankingsForEvent(key) : [], [key]);
+
+  // Real matches from Statbotics
+  const [matches,       setMatches]       = useState<Match[]>([]);
+  const [matchesLoading, setMatchesLoading] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+
+  // Fetch real matches from Statbotics on load
+  useEffect(() => {
+    if (!key) return;
+    setMatchesLoading(true);
+    fetchEventMatches(key).then(raw => {
+      setMatches(
+        raw
+          .map(adaptMatch)
+          .sort((a, b) => {
+            const lvl = ['qm', 'qf', 'sf', 'f'];
+            const li = lvl.indexOf(a.comp_level), lj = lvl.indexOf(b.comp_level);
+            if (li !== lj) return li - lj;
+            if (a.set_number !== b.set_number) return a.set_number - b.set_number;
+            return a.match_number - b.match_number;
+          })
+      );
+      setMatchesLoading(false);
+    });
+  }, [key]);
 
   // Fetch team numbers when Teams tab is first opened
   useEffect(() => {
@@ -100,13 +127,15 @@ export function EventDetail() {
     };
   });
 
-  const quals    = matches.filter(m => m.comp_level === 'qm');
-  const playoffs = matches.filter(m => m.comp_level !== 'qm');
   const teamCount = event.num_teams ?? eventTeamNums.length;
   const location  = [event.state, event.country].filter(Boolean).join(', ');
 
+  const pinned = event ? isPinned(event.key) : false;
+
   return (
     <div className="page" ref={pageRef}>
+      <MatchDetailModal match={selectedMatch} onClose={() => setSelectedMatch(null)} />
+
       <Link to="/events" className="back-btn">← Events</Link>
 
       <div className="detail-header">
@@ -126,7 +155,14 @@ export function EventDetail() {
             </span>
           )}
         </div>
-        <div className="detail-title">{event.name}</div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
+          <div className="detail-title">{event.name}</div>
+          <button
+            className={`pin-btn detail-pin${pinned ? ' pinned' : ''}`}
+            onClick={() => toggle(event.key)}
+            title={pinned ? 'Unpin event' : 'Pin event'}
+          >{pinned ? '★' : '☆'}</button>
+        </div>
         <div className="detail-subtitle">{location}</div>
         <div className="detail-subtitle" style={{ marginTop: 4 }}>
           {formatDate(event.start_date, event.end_date)}
@@ -151,11 +187,11 @@ export function EventDetail() {
           </div>
           <div className="stat-chip">
             <div className="stat-chip-label">Qual Matches</div>
-            <div className="stat-chip-value">{quals.length || '—'}</div>
+            <div className="stat-chip-value">{matches.filter(m => m.comp_level === 'qm').length || '—'}</div>
           </div>
           <div className="stat-chip">
             <div className="stat-chip-label">Playoff Matches</div>
-            <div className="stat-chip-value">{playoffs.length || '—'}</div>
+            <div className="stat-chip-value">{matches.filter(m => m.comp_level !== 'qm').length || '—'}</div>
           </div>
         </div>
       </div>
@@ -168,28 +204,48 @@ export function EventDetail() {
         </button>
       </div>
 
-      {tab === 'matches' && (
-        <>
-          {quals.length > 0 && (
-            <div style={{ marginBottom: '1rem' }}>
-              <div className="section-title" style={{ marginBottom: '0.4rem' }}>Qualification Matches</div>
-              <div className="card">{quals.map(m => <MatchRow key={m.key} match={m} />)}</div>
-            </div>
-          )}
-          {playoffs.length > 0 && (
-            <div>
-              <div className="section-title" style={{ marginBottom: '0.4rem' }}>Playoff Matches</div>
-              <div className="card">{playoffs.map(m => <MatchRow key={m.key} match={m} />)}</div>
-            </div>
-          )}
-          {matches.length === 0 && (
-            <div className="empty-state">
-              <div className="empty-icon">⚙️</div>
-              <div>Match data not available</div>
-            </div>
-          )}
-        </>
-      )}
+      {tab === 'matches' && (() => {
+        const quals    = matches.filter(m => m.comp_level === 'qm');
+        const playoffs = matches.filter(m => m.comp_level !== 'qm');
+        return (
+          <>
+            {matchesLoading && (
+              <div className="card">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="match-row">
+                    <div className="skeleton skeleton-line" style={{ width: 28, height: 13 }} />
+                    <div className="skeleton skeleton-line" style={{ width: '22%', height: 34 }} />
+                    <div className="skeleton skeleton-line" style={{ width: 72, height: 28 }} />
+                    <div className="skeleton skeleton-line" style={{ width: '22%', height: 34 }} />
+                  </div>
+                ))}
+              </div>
+            )}
+            {!matchesLoading && quals.length > 0 && (
+              <div style={{ marginBottom: '1rem' }}>
+                <div className="section-title" style={{ marginBottom: '0.4rem' }}>Qualification Matches</div>
+                <div className="card">
+                  {quals.map(m => <MatchRow key={m.key} match={m} onClick={setSelectedMatch} />)}
+                </div>
+              </div>
+            )}
+            {!matchesLoading && playoffs.length > 0 && (
+              <div>
+                <div className="section-title" style={{ marginBottom: '0.4rem' }}>Playoff Matches</div>
+                <div className="card">
+                  {playoffs.map(m => <MatchRow key={m.key} match={m} onClick={setSelectedMatch} />)}
+                </div>
+              </div>
+            )}
+            {!matchesLoading && matches.length === 0 && (
+              <div className="empty-state">
+                <div className="empty-icon">⚙️</div>
+                <div>Match schedule not yet available</div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {tab === 'rankings' && (
         rankings.length === 0 ? (

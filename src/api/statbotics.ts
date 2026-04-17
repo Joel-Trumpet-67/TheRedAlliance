@@ -194,6 +194,91 @@ export async function fetchTeamNumbersForEvent(eventKey: string): Promise<number
   }
 }
 
+// ─── Match interfaces ─────────────────────────────────────────────────────────
+
+export interface SBMatchAlliance {
+  teams:      string[];   // e.g. ["frc1234", "frc5678", "frc9012"]
+  score:      number;
+  auto:       number;
+  teleop:     number;
+  endgame:    number;
+  fouls:      number;
+  no_foul:    number;
+  rp_1:       number;     // 0 or 1
+  rp_2:       number;     // 0 or 1
+  tiebreaker: number;
+}
+
+export interface SBMatchEPASide {
+  total_points:   { mean: number; sd: number };
+  auto_points:    { mean: number; sd: number };
+  teleop_points:  { mean: number; sd: number };
+  endgame_points: { mean: number; sd: number };
+}
+
+export interface SBMatch {
+  key:           string;
+  year:          number;
+  event:         string;
+  time:          number | null;
+  comp_level:    string;
+  set_number:    number;
+  match_number:  number;
+  status:        string;  // 'Upcoming' | 'In Progress' | 'Completed'
+  video:         string | null;
+  red:           SBMatchAlliance;
+  blue:          SBMatchAlliance;
+  winner:        string | null;
+  epa: {
+    red:      SBMatchEPASide;
+    blue:     SBMatchEPASide;
+    win_prob: number;
+  } | null;
+}
+
+/** Converts a Statbotics match into the app's Match shape. */
+export function adaptMatch(sb: SBMatch): import('../data/mockData').Match {
+  const played = sb.status !== 'Upcoming';
+  return {
+    key:               sb.key,
+    comp_level:        sb.comp_level as 'qm' | 'qf' | 'sf' | 'f',
+    match_number:      sb.match_number,
+    set_number:        sb.set_number,
+    red_alliance:      sb.red.teams.map(t => parseInt(t.replace('frc', ''), 10)),
+    blue_alliance:     sb.blue.teams.map(t => parseInt(t.replace('frc', ''), 10)),
+    red_score:         played ? sb.red.score  : null,
+    blue_score:        played ? sb.blue.score : null,
+    winning_alliance:  (sb.winner || null) as 'red' | 'blue' | 'tie' | null,
+    time:              sb.time ? new Date(sb.time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+  };
+}
+
+/** Fetches all matches for an event. No cache — intended for live/frequent use. */
+export async function fetchEventMatches(eventKey: string): Promise<SBMatch[]> {
+  try {
+    const res = await fetch(`${BASE}/matches?event=${eventKey}&limit=500`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+/** Fetches a single match with full breakdown. */
+export async function fetchMatch(matchKey: string): Promise<SBMatch | null> {
+  try {
+    const res = await fetch(`${BASE}/match/${matchKey}`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Fetches the events a team attended in a given year (defaults to current year).
  * Used by TeamDetail to list events and their matches.

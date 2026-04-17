@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useEvents } from '../context/EventsContext';
+import { usePinnedEvents } from '../context/PinnedEventsContext';
 import { EventCard } from '../components/EventCard';
 import { usePageEntrance } from '../hooks/usePageEntrance';
 import { useStagger } from '../hooks/useStagger';
@@ -12,6 +13,7 @@ export function Events() {
   const [query,  setQuery]  = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
   const { events, loading, year, setYear } = useEvents();
+  const { pinned } = usePinnedEvents();
   const pageRef = usePageEntrance();
 
   const filtered = events.filter(e => {
@@ -86,6 +88,20 @@ export function Events() {
           </button>
         ))}
       </div>
+
+      {/* Pinned events — shown above the main list when any are pinned */}
+      {!loading && pinned.size > 0 && (() => {
+        const pinnedEvents = events.filter(e => pinned.has(e.key));
+        if (pinnedEvents.length === 0) return null;
+        return (
+          <div style={{ marginBottom: '1.25rem' }}>
+            <div className="section-title" style={{ marginBottom: '0.4rem' }}>Pinned</div>
+            <div className="card-list">
+              {pinnedEvents.map(e => <EventCard key={e.key} event={e} />)}
+            </div>
+          </div>
+        );
+      })()}
 
       {loading ? (
         <div className="card-list">

@@ -7,9 +7,11 @@ import { Events } from './pages/Events';
 import { EventDetail } from './pages/EventDetail';
 import { TeamsProvider } from './context/TeamsContext';
 import { EventsProvider } from './context/EventsContext';
+import { PinnedEventsProvider } from './context/PinnedEventsContext';
 
 export default function App() {
   return (
+    <PinnedEventsProvider>
     <TeamsProvider>
     <EventsProvider>
       <BrowserRouter>
@@ -26,6 +28,7 @@ export default function App() {
       </BrowserRouter>
     </EventsProvider>
     </TeamsProvider>
+    </PinnedEventsProvider>
   );
 }
 

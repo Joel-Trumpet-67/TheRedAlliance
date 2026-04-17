@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { Event } from '../data/mockData';
+import { usePinnedEvents } from '../context/PinnedEventsContext';
 
 interface Props {
   event: Event;
@@ -39,11 +40,13 @@ function statusDot(status?: string) {
 }
 
 export function EventCard({ event }: Props) {
+  const { isPinned, toggle } = usePinnedEvents();
+  const pinned   = isPinned(event.key);
   const location = [event.state, event.country].filter(Boolean).join(', ');
   const teamCount = event.num_teams ?? event.teams.length;
 
   return (
-    <div className="card">
+    <div className="card" style={{ position: 'relative' }}>
       <Link to={`/events/${event.key}`} className="card-link">
         <div className="event-card">
           <span className={`event-badge ${badgeClass(event.event_type)}`}>
@@ -60,6 +63,13 @@ export function EventCard({ event }: Props) {
           </div>
         </div>
       </Link>
+      <button
+        className={`pin-btn${pinned ? ' pinned' : ''}`}
+        onClick={e => { e.preventDefault(); toggle(event.key); }}
+        title={pinned ? 'Unpin event' : 'Pin event'}
+      >
+        {pinned ? '★' : '☆'}
+      </button>
     </div>
   );
 }
