@@ -197,58 +197,77 @@ export async function fetchTeamNumbersForEvent(eventKey: string): Promise<number
 // ─── Match interfaces ─────────────────────────────────────────────────────────
 
 export interface SBMatchAlliance {
-  teams:      string[];   // e.g. ["frc1234", "frc5678", "frc9012"]
-  score:      number;
-  auto:       number;
-  teleop:     number;
-  endgame:    number;
-  fouls:      number;
-  no_foul:    number;
-  rp_1:       number;     // 0 or 1
-  rp_2:       number;     // 0 or 1
-  tiebreaker: number;
+  team_keys:           number[];
+  surrogate_team_keys: number[];
+  dq_team_keys:        number[];
 }
 
-export interface SBMatchEPASide {
-  total_points:   { mean: number; sd: number };
-  auto_points:    { mean: number; sd: number };
-  teleop_points:  { mean: number; sd: number };
-  endgame_points: { mean: number; sd: number };
+export interface SBMatchResult {
+  winner:               string | null;
+  red_score:            number;
+  blue_score:           number;
+  red_no_foul:          number;
+  blue_no_foul:         number;
+  red_auto_points:      number;
+  blue_auto_points:     number;
+  red_teleop_points:    number;
+  blue_teleop_points:   number;
+  red_endgame_points:   number;
+  blue_endgame_points:  number;
+  red_rp_1:             boolean;
+  blue_rp_1:            boolean;
+  red_rp_2:             boolean;
+  blue_rp_2:            boolean;
+  red_rp_3?:            boolean;
+  blue_rp_3?:           boolean;
+}
+
+export interface SBMatchPred {
+  winner:        string | null;
+  red_win_prob:  number;
+  red_score:     number;
+  blue_score:    number;
+  red_rp_1:      number;
+  blue_rp_1:     number;
+  red_rp_2:      number;
+  blue_rp_2:     number;
 }
 
 export interface SBMatch {
-  key:           string;
-  year:          number;
-  event:         string;
-  time:          number | null;
-  comp_level:    string;
-  set_number:    number;
-  match_number:  number;
-  status:        string;  // 'Upcoming' | 'In Progress' | 'Completed'
-  video:         string | null;
-  red:           SBMatchAlliance;
-  blue:          SBMatchAlliance;
-  winner:        string | null;
-  epa: {
-    red:      SBMatchEPASide;
-    blue:     SBMatchEPASide;
-    win_prob: number;
-  } | null;
+  key:            string;
+  year:           number;
+  event:          string;
+  elim:           boolean;
+  comp_level:     string;
+  set_number:     number;
+  match_number:   number;
+  match_name:     string;
+  time:           number | null;
+  predicted_time: number | null;
+  status:         string;   // 'Upcoming' | 'In Progress' | 'Completed'
+  video:          string | null;
+  alliances: {
+    red:  SBMatchAlliance;
+    blue: SBMatchAlliance;
+  };
+  pred:   SBMatchPred   | null;
+  result: SBMatchResult | null;
 }
 
 /** Converts a Statbotics match into the app's Match shape. */
 export function adaptMatch(sb: SBMatch): import('../data/mockData').Match {
-  const played = sb.status !== 'Upcoming';
+  const r      = sb.result;
+  const played = sb.status !== 'Upcoming' && r != null;
   return {
     key:              sb.key,
     comp_level:       (sb.comp_level ?? 'qm') as 'qm' | 'qf' | 'sf' | 'f',
     match_number:     sb.match_number ?? 0,
     set_number:       sb.set_number   ?? 1,
-    red_alliance:     (sb.red?.teams  ?? []).map(t => parseInt(t.replace('frc', ''), 10)),
-    blue_alliance:    (sb.blue?.teams ?? []).map(t => parseInt(t.replace('frc', ''), 10)),
-    red_score:        played ? (sb.red?.score  ?? null) : null,
-    blue_score:       played ? (sb.blue?.score ?? null) : null,
-    winning_alliance: (sb.winner || null) as 'red' | 'blue' | 'tie' | null,
+    red_alliance:     sb.alliances?.red?.team_keys  ?? [],
+    blue_alliance:    sb.alliances?.blue?.team_keys ?? [],
+    red_score:        played ? r!.red_score  : null,
+    blue_score:       played ? r!.blue_score : null,
+    winning_alliance: played ? (r!.winner || null) as 'red' | 'blue' | 'tie' | null : null,
     time:             sb.time ? new Date(sb.time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
   };
 }

@@ -121,61 +121,66 @@ export function MatchDetailModal({ match, onClose }: Props) {
           <div className="modal-loading">Loading breakdown…</div>
         )}
 
-        {detail && (
-          <>
-            {/* Score breakdown */}
-            <div className="mbd-section-title">Score Breakdown</div>
-            <div className="mbd-card">
-              <Row label="Total"    red={detail.red.score}    blue={detail.blue.score}
-                   redClass={redWon ? 'strong' : ''} blueClass={blueWon ? 'strong' : ''} />
-              <Row label="Auto"     red={detail.red.auto}     blue={detail.blue.auto} />
-              <Row label="Teleop"   red={detail.red.teleop}   blue={detail.blue.teleop} />
-              <Row label="Endgame"  red={detail.red.endgame}  blue={detail.blue.endgame} />
-              <Row label="Fouls +"  red={detail.red.fouls}    blue={detail.blue.fouls}
-                   redClass="muted" blueClass="muted" />
-            </div>
+        {detail?.result && (() => {
+          const res  = detail.result!;
+          const pred = detail.pred;
+          const redFouls  = res.red_score  - res.red_no_foul;
+          const blueFouls = res.blue_score - res.blue_no_foul;
+          return (
+            <>
+              {/* Score breakdown */}
+              <div className="mbd-section-title">Score Breakdown</div>
+              <div className="mbd-card">
+                <Row label="Total"   red={res.red_score}           blue={res.blue_score}
+                     redClass={redWon ? 'strong' : ''} blueClass={blueWon ? 'strong' : ''} />
+                <Row label="Auto"    red={res.red_auto_points}     blue={res.blue_auto_points} />
+                <Row label="Teleop"  red={res.red_teleop_points}   blue={res.blue_teleop_points} />
+                <Row label="Endgame" red={res.red_endgame_points}  blue={res.blue_endgame_points} />
+                {(redFouls > 0 || blueFouls > 0) && (
+                  <Row label="Fouls +" red={redFouls} blue={blueFouls} redClass="muted" blueClass="muted" />
+                )}
+              </div>
 
-            {/* Ranking points (qual matches only) */}
-            {match.comp_level === 'qm' && (
-              <>
-                <div className="mbd-section-title">Ranking Points</div>
-                <div className="mbd-card">
-                  <RpRow label="RP 1" redEarned={detail.red.rp_1 === 1} blueEarned={detail.blue.rp_1 === 1} />
-                  <RpRow label="RP 2" redEarned={detail.red.rp_2 === 1} blueEarned={detail.blue.rp_2 === 1} />
-                  <RpRow label="Win"  redEarned={redWon}                 blueEarned={blueWon} />
-                </div>
-              </>
-            )}
+              {/* Ranking points (qual only) */}
+              {match.comp_level === 'qm' && (
+                <>
+                  <div className="mbd-section-title">Ranking Points</div>
+                  <div className="mbd-card">
+                    <RpRow label="RP 1" redEarned={res.red_rp_1}  blueEarned={res.blue_rp_1} />
+                    <RpRow label="RP 2" redEarned={res.red_rp_2}  blueEarned={res.blue_rp_2} />
+                    {(res.red_rp_3 !== undefined) && (
+                      <RpRow label="RP 3" redEarned={!!res.red_rp_3} blueEarned={!!res.blue_rp_3} />
+                    )}
+                    <RpRow label="Win"  redEarned={redWon}         blueEarned={blueWon} />
+                  </div>
+                </>
+              )}
 
-            {/* EPA projections */}
-            {detail.epa && (
-              <>
-                <div className="mbd-section-title">EPA Projections</div>
-                <div className="mbd-card">
-                  <Row label="Predicted Score"
-                       red={detail.epa.red.total_points.mean.toFixed(1)}
-                       blue={detail.epa.blue.total_points.mean.toFixed(1)} />
-                  <Row label="Auto"
-                       red={detail.epa.red.auto_points.mean.toFixed(1)}
-                       blue={detail.epa.blue.auto_points.mean.toFixed(1)} />
-                  <Row label="Teleop"
-                       red={detail.epa.red.teleop_points.mean.toFixed(1)}
-                       blue={detail.epa.blue.teleop_points.mean.toFixed(1)} />
-                  <Row label="Endgame"
-                       red={detail.epa.red.endgame_points.mean.toFixed(1)}
-                       blue={detail.epa.blue.endgame_points.mean.toFixed(1)} />
-                  <Row label="Win Probability"
-                       red={`${(detail.epa.win_prob * 100).toFixed(0)}%`}
-                       blue={`${((1 - detail.epa.win_prob) * 100).toFixed(0)}%`} />
-                  <Row label="Std Dev"
-                       red={`±${detail.epa.red.total_points.sd.toFixed(1)}`}
-                       blue={`±${detail.epa.blue.total_points.sd.toFixed(1)}`}
-                       redClass="muted" blueClass="muted" />
-                </div>
-              </>
-            )}
-          </>
-        )}
+              {/* Predictions */}
+              {pred && (
+                <>
+                  <div className="mbd-section-title">Predictions</div>
+                  <div className="mbd-card">
+                    <Row label="Predicted Score"
+                         red={pred.red_score.toFixed(1)}
+                         blue={pred.blue_score.toFixed(1)} />
+                    <Row label="Win Probability"
+                         red={`${(pred.red_win_prob * 100).toFixed(0)}%`}
+                         blue={`${((1 - pred.red_win_prob) * 100).toFixed(0)}%`} />
+                    <Row label="RP 1 Chance"
+                         red={`${(pred.red_rp_1 * 100).toFixed(0)}%`}
+                         blue={`${(pred.blue_rp_1 * 100).toFixed(0)}%`}
+                         redClass="muted" blueClass="muted" />
+                    <Row label="RP 2 Chance"
+                         red={`${(pred.red_rp_2 * 100).toFixed(0)}%`}
+                         blue={`${(pred.blue_rp_2 * 100).toFixed(0)}%`}
+                         redClass="muted" blueClass="muted" />
+                  </div>
+                </>
+              )}
+            </>
+          );
+        })()}
       </div>
     </>
   );
