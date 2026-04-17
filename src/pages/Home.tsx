@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import anime from 'animejs';
 import { events } from '../data/mockData';
 import { EventCard } from '../components/EventCard';
 import { TeamCard } from '../components/TeamCard';
 import { usePageEntrance } from '../hooks/usePageEntrance';
 import { useStagger } from '../hooks/useStagger';
 import { useCountUp } from '../hooks/useCountUp';
+import { useScrollReveal } from '../hooks/useScrollReveal';
 import { useTeams } from '../context/TeamsContext';
 
 function AnimatedStat({ value, label }: { value: number; label: string }) {
@@ -25,10 +27,80 @@ export function Home() {
   const eventsRef = useStagger<HTMLDivElement>([], { delay: 70 });
   const teamsRef  = useStagger<HTMLDivElement>([loading], { delay: 55 });
 
+  const heroRef    = useRef<HTMLDivElement>(null);
+  const titleRef   = useRef<HTMLDivElement>(null);
+  const subtitleRef = useRef<HTMLDivElement>(null);
+
+  const eventsHeaderRef = useScrollReveal();
+  const teamsHeaderRef  = useScrollReveal({ delay: 60 });
+
+  // Hide subtitle before paint so it can fade in after chars
+  useLayoutEffect(() => {
+    if (subtitleRef.current) subtitleRef.current.style.opacity = '0';
+  }, []);
+
+  // Split hero title into chars and stagger-animate them in
   useEffect(() => {
-    const isIOS       = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const el = titleRef.current;
+    if (!el) return;
+    const text = el.textContent ?? '';
+    const words = text.trim().split(' ');
+    el.innerHTML = words.map(word => {
+      const chars = word.split('').map(ch =>
+        `<span class="hero-char">${ch}</span>`
+      ).join('');
+      return `<span class="hero-word">${chars}</span>`;
+    }).join('<span style="display:inline-block;width:0.28em"></span>');
+
+    const charCount = text.replace(/ /g, '').length;
+
+    anime({
+      targets: el.querySelectorAll('.hero-char'),
+      opacity: [0, 1],
+      translateY: [28, 0],
+      duration: 600,
+      delay: anime.stagger(28, { start: 260 }),
+      easing: 'easeOutQuart',
+    });
+
+    // Subtitle fades in after chars land
+    anime({
+      targets: subtitleRef.current,
+      opacity: [0, 1],
+      translateY: [10, 0],
+      duration: 480,
+      delay: 260 + charCount * 28 + 80,
+      easing: 'easeOutCubic',
+    });
+  }, []);
+
+  // Mousemove parallax on hero orbs
+  useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero) return;
+    const onMove = (e: MouseEvent) => {
+      const rect = hero.getBoundingClientRect();
+      const cx = rect.left + rect.width  / 2;
+      const cy = rect.top  + rect.height / 2;
+      hero.querySelectorAll<HTMLElement>('.hero-orb').forEach(orb => {
+        const depth = parseFloat(orb.dataset.depth ?? '0.03');
+        anime({
+          targets: orb,
+          translateX: (e.clientX - cx) * depth,
+          translateY: (e.clientY - cy) * depth,
+          duration: 1200,
+          easing: 'easeOutQuad',
+        });
+      });
+    };
+    hero.addEventListener('mousemove', onMove);
+    return () => hero.removeEventListener('mousemove', onMove);
+  }, []);
+
+  useEffect(() => {
+    const isIOS        = /iPad|iPhone|iPod/.test(navigator.userAgent);
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    const dismissed   = localStorage.getItem('install-banner-dismissed');
+    const dismissed    = localStorage.getItem('install-banner-dismissed');
     if (isIOS && !isStandalone && !dismissed) setShowBanner(true);
   }, []);
 
@@ -61,9 +133,14 @@ export function Home() {
         </div>
       )}
 
-      <div className="hero">
-        <div className="hero-title">The Red Alliance</div>
-        <div className="hero-subtitle">FIRST Robotics Competition · All Seasons</div>
+      <div className="hero" ref={heroRef}>
+        {/* Ambient orbs — shift with mouse for subtle depth */}
+        <div className="hero-orb hero-orb-1" data-depth="0.04"></div>
+        <div className="hero-orb hero-orb-2" data-depth="-0.03"></div>
+
+        <div className="hero-title" ref={titleRef}>The Red Alliance</div>
+        <div className="hero-subtitle" ref={subtitleRef}>FIRST Robotics Competition · All Seasons</div>
+
         {loading ? (
           <div className="hero-stats">
             <div className="hero-stat">
@@ -86,7 +163,10 @@ export function Home() {
 
       {/* Upcoming Events */}
       <div style={{ marginBottom: '1.75rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+        <div
+          ref={eventsHeaderRef}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}
+        >
           <div className="section-title">Upcoming Events</div>
           <Link to="/events" style={{ fontSize: '0.8rem', color: 'var(--red-400)', fontWeight: 600 }}>View all →</Link>
         </div>
@@ -97,7 +177,10 @@ export function Home() {
 
       {/* Top Teams */}
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+        <div
+          ref={teamsHeaderRef}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}
+        >
           <div className="section-title">Top Teams by Wins</div>
           <Link to="/teams" style={{ fontSize: '0.8rem', color: 'var(--red-400)', fontWeight: 600 }}>View all →</Link>
         </div>

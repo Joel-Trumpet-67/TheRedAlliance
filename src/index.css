@@ -531,6 +531,36 @@ input { font-family: inherit; }
   font-weight: 600;
 }
 
+/* ===== HERO ORBS (mousemove parallax) ===== */
+.hero-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  pointer-events: none;
+  will-change: transform;
+  z-index: 0;
+}
+
+.hero-orb-1 {
+  width: 340px; height: 220px;
+  background: radial-gradient(circle, rgba(220,38,38,0.2) 0%, transparent 70%);
+  top: -70px; left: -90px;
+}
+
+.hero-orb-2 {
+  width: 260px; height: 180px;
+  background: radial-gradient(circle, rgba(185,28,28,0.14) 0%, transparent 70%);
+  bottom: -50px; right: -60px;
+}
+
+/* ===== HERO CHAR (letter-by-letter stagger animation) ===== */
+.hero-char {
+  display: inline-block;
+  will-change: transform, opacity;
+}
+
+.hero-word { display: inline-block; }
+
 /* ===== GRID LIST ===== */
 .card-list { display: flex; flex-direction: column; gap: 0.5rem; }
 
