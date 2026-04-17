@@ -38,7 +38,7 @@ function adaptSBTeamEvent(sb: SBTeamEvent): Event {
   };
 }
 
-const YEARS = [2025, 2024, 2023, 2022, 2019, 2018];
+const YEARS = [2026, 2025, 2024, 2023, 2022, 2019, 2018];
 
 function StatChip({ label, value, color }: { label: string; value: number; color?: string }) {
   const counted = useCountUp(value, 900);
@@ -54,7 +54,7 @@ export function TeamDetail() {
   const { number }  = useParams<{ number: string }>();
   const navigate    = useNavigate();
   const [tab, setTab] = useState<'events' | 'matches'>('events');
-  const [evYear, setEvYear] = useState(2025);
+  const [evYear, setEvYear] = useState(new Date().getFullYear());
   const pageRef     = usePageEntrance();
   const { teams, loading } = useTeams();
 

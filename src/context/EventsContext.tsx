@@ -50,10 +50,10 @@ interface EventsCtxValue {
 }
 
 const EventsCtx = createContext<EventsCtxValue>({
-  events: [], loading: true, error: null, year: 2025, setYear: () => {},
+  events: [], loading: true, error: null, year: new Date().getFullYear(), setYear: () => {},
 });
 
-const CURRENT_YEAR = 2025;
+const CURRENT_YEAR = new Date().getFullYear();
 
 export function EventsProvider({ children }: { children: React.ReactNode }) {
   const [year,    setYear]    = useState(CURRENT_YEAR);
