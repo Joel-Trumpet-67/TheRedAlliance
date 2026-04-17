@@ -240,16 +240,16 @@ export interface SBMatch {
 export function adaptMatch(sb: SBMatch): import('../data/mockData').Match {
   const played = sb.status !== 'Upcoming';
   return {
-    key:               sb.key,
-    comp_level:        sb.comp_level as 'qm' | 'qf' | 'sf' | 'f',
-    match_number:      sb.match_number,
-    set_number:        sb.set_number,
-    red_alliance:      sb.red.teams.map(t => parseInt(t.replace('frc', ''), 10)),
-    blue_alliance:     sb.blue.teams.map(t => parseInt(t.replace('frc', ''), 10)),
-    red_score:         played ? sb.red.score  : null,
-    blue_score:        played ? sb.blue.score : null,
-    winning_alliance:  (sb.winner || null) as 'red' | 'blue' | 'tie' | null,
-    time:              sb.time ? new Date(sb.time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+    key:              sb.key,
+    comp_level:       (sb.comp_level ?? 'qm') as 'qm' | 'qf' | 'sf' | 'f',
+    match_number:     sb.match_number ?? 0,
+    set_number:       sb.set_number   ?? 1,
+    red_alliance:     (sb.red?.teams  ?? []).map(t => parseInt(t.replace('frc', ''), 10)),
+    blue_alliance:    (sb.blue?.teams ?? []).map(t => parseInt(t.replace('frc', ''), 10)),
+    red_score:        played ? (sb.red?.score  ?? null) : null,
+    blue_score:       played ? (sb.blue?.score ?? null) : null,
+    winning_alliance: (sb.winner || null) as 'red' | 'blue' | 'tie' | null,
+    time:             sb.time ? new Date(sb.time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
   };
 }
 

@@ -55,21 +55,28 @@ export function EventDetail() {
   // Fetch real matches from Statbotics on load
   useEffect(() => {
     if (!key) return;
+    let cancelled = false;
     setMatchesLoading(true);
-    fetchEventMatches(key).then(raw => {
-      setMatches(
-        raw
-          .map(adaptMatch)
-          .sort((a, b) => {
-            const lvl = ['qm', 'qf', 'sf', 'f'];
-            const li = lvl.indexOf(a.comp_level), lj = lvl.indexOf(b.comp_level);
-            if (li !== lj) return li - lj;
-            if (a.set_number !== b.set_number) return a.set_number - b.set_number;
-            return a.match_number - b.match_number;
-          })
-      );
-      setMatchesLoading(false);
-    });
+    fetchEventMatches(key)
+      .then(raw => {
+        if (cancelled) return;
+        try {
+          setMatches(
+            raw
+              .map(adaptMatch)
+              .sort((a, b) => {
+                const lvl = ['qm', 'qf', 'sf', 'f'];
+                const li = lvl.indexOf(a.comp_level), lj = lvl.indexOf(b.comp_level);
+                if (li !== lj) return li - lj;
+                if (a.set_number !== b.set_number) return a.set_number - b.set_number;
+                return a.match_number - b.match_number;
+              })
+          );
+        } catch { /* bad data — leave matches empty */ }
+        setMatchesLoading(false);
+      })
+      .catch(() => { if (!cancelled) setMatchesLoading(false); });
+    return () => { cancelled = true; };
   }, [key]);
 
   // Fetch team numbers when Teams tab is first opened
