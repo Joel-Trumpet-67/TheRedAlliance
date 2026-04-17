@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import anime from 'animejs';
 import type { Match } from '../data/mockData';
-import { fetchMatch, type SBMatch } from '../api/statbotics';
+import type { SBMatch } from '../api/statbotics';
 
 interface Props {
   match:    Match | null;
+  sbMatch:  SBMatch | null;
   onClose:  () => void;
 }
 
@@ -34,9 +35,7 @@ function RpRow({ label, redEarned, blueEarned }: {
   );
 }
 
-export function MatchDetailModal({ match, onClose }: Props) {
-  const [detail,  setDetail]  = useState<SBMatch | null>(null);
-  const [loading, setLoading] = useState(false);
+export function MatchDetailModal({ match, sbMatch, onClose }: Props) {
   const sheetRef = useRef<HTMLDivElement>(null);
 
   // Animate in
@@ -50,17 +49,9 @@ export function MatchDetailModal({ match, onClose }: Props) {
     });
   }, [match]);
 
-  // Fetch breakdown from Statbotics
-  useEffect(() => {
-    if (!match) { setDetail(null); return; }
-    setLoading(true);
-    fetchMatch(match.key).then(d => {
-      setDetail(d);
-      setLoading(false);
-    });
-  }, [match?.key]);
-
   if (!match) return null;
+
+  const detail = sbMatch;
 
   const label = match.comp_level === 'qm'
     ? `Qual ${match.match_number}`
@@ -116,10 +107,6 @@ export function MatchDetailModal({ match, onClose }: Props) {
             </div>
           </div>
         </div>
-
-        {loading && (
-          <div className="modal-loading">Loading breakdown…</div>
-        )}
 
         {detail?.result && (() => {
           const res  = detail.result!;

@@ -8,7 +8,7 @@ import { useStagger } from '../hooks/useStagger';
 import { useTeams } from '../context/TeamsContext';
 import { useEvents } from '../context/EventsContext';
 import { usePinnedEvents } from '../context/PinnedEventsContext';
-import { fetchTeamNumbersForEvent, fetchEventMatches, fetchEventRankings, adaptMatch } from '../api/statbotics';
+import { fetchTeamNumbersForEvent, fetchEventMatches, fetchEventRankings, adaptMatch, type SBMatch } from '../api/statbotics';
 
 type Tab = 'matches' | 'rankings' | 'teams';
 
@@ -46,9 +46,11 @@ export function EventDetail() {
   const { isPinned, toggle } = usePinnedEvents();
   const event    = events.find(e => e.key === key);
   const [rankings, setRankings] = useState<Ranking[]>([]);
+  const [rankingsLoading, setRankingsLoading] = useState(false);
 
   // Real matches from Statbotics
   const [matches,       setMatches]       = useState<Match[]>([]);
+  const [rawMatches,    setRawMatches]    = useState<SBMatch[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
 
@@ -61,17 +63,15 @@ export function EventDetail() {
       .then(raw => {
         if (cancelled) return;
         try {
-          setMatches(
-            raw
-              .map(adaptMatch)
-              .sort((a, b) => {
-                const lvl = ['qm', 'qf', 'sf', 'f'];
-                const li = lvl.indexOf(a.comp_level), lj = lvl.indexOf(b.comp_level);
-                if (li !== lj) return li - lj;
-                if (a.set_number !== b.set_number) return a.set_number - b.set_number;
-                return a.match_number - b.match_number;
-              })
-          );
+          const sorted = [...raw].sort((a, b) => {
+            const lvl = ['qm', 'qf', 'sf', 'f'];
+            const li = lvl.indexOf(a.comp_level), lj = lvl.indexOf(b.comp_level);
+            if (li !== lj) return li - lj;
+            if (a.set_number !== b.set_number) return a.set_number - b.set_number;
+            return a.match_number - b.match_number;
+          });
+          setRawMatches(sorted);
+          setMatches(sorted.map(adaptMatch));
         } catch { /* bad data — leave matches empty */ }
         setMatchesLoading(false);
       })
@@ -81,9 +81,10 @@ export function EventDetail() {
 
   // Fetch rankings when Rankings tab is first opened
   useEffect(() => {
-    if (tab !== 'rankings' || !key || rankings.length > 0) return;
-    fetchEventRankings(key).then(setRankings);
-  }, [tab, key, rankings.length]);
+    if (tab !== 'rankings' || !key || rankings.length > 0 || rankingsLoading) return;
+    setRankingsLoading(true);
+    fetchEventRankings(key).then(r => { setRankings(r); setRankingsLoading(false); });
+  }, [tab, key, rankings.length, rankingsLoading]);
 
   // Fetch team numbers when Teams tab is first opened
   useEffect(() => {
@@ -147,7 +148,11 @@ export function EventDetail() {
 
   return (
     <div className="page" ref={pageRef}>
-      <MatchDetailModal match={selectedMatch} onClose={() => setSelectedMatch(null)} />
+      <MatchDetailModal
+        match={selectedMatch}
+        sbMatch={selectedMatch ? (rawMatches.find(r => r.key === selectedMatch.key) ?? null) : null}
+        onClose={() => setSelectedMatch(null)}
+      />
 
       <Link to="/events" className="back-btn">← Events</Link>
 
@@ -261,7 +266,17 @@ export function EventDetail() {
       })()}
 
       {tab === 'rankings' && (
-        rankings.length === 0 ? (
+        rankingsLoading ? (
+          <div className="card">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} style={{ display: 'flex', gap: '1rem', padding: '0.6rem 0.75rem', borderBottom: '1px solid var(--border)' }}>
+                <div className="skeleton skeleton-line" style={{ width: 24, height: 13 }} />
+                <div className="skeleton skeleton-line" style={{ width: 48, height: 13 }} />
+                <div className="skeleton skeleton-line" style={{ width: 60, height: 13, marginLeft: 'auto' }} />
+              </div>
+            ))}
+          </div>
+        ) : rankings.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">📊</div>
             <div>Rankings not available</div>
