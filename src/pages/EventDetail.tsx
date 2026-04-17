@@ -1,14 +1,14 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getRankingsForEvent, type Match } from '../data/mockData';
+import type { Match, Ranking } from '../data/mockData';
 import { MatchRow } from '../components/MatchRow';
 import { MatchDetailModal } from '../components/MatchDetailModal';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePageEntrance } from '../hooks/usePageEntrance';
 import { useStagger } from '../hooks/useStagger';
 import { useTeams } from '../context/TeamsContext';
 import { useEvents } from '../context/EventsContext';
 import { usePinnedEvents } from '../context/PinnedEventsContext';
-import { fetchTeamNumbersForEvent, fetchEventMatches, adaptMatch } from '../api/statbotics';
+import { fetchTeamNumbersForEvent, fetchEventMatches, fetchEventRankings, adaptMatch } from '../api/statbotics';
 
 type Tab = 'matches' | 'rankings' | 'teams';
 
@@ -45,7 +45,7 @@ export function EventDetail() {
 
   const { isPinned, toggle } = usePinnedEvents();
   const event    = events.find(e => e.key === key);
-  const rankings = useMemo(() => key ? getRankingsForEvent(key) : [], [key]);
+  const [rankings, setRankings] = useState<Ranking[]>([]);
 
   // Real matches from Statbotics
   const [matches,       setMatches]       = useState<Match[]>([]);
@@ -78,6 +78,12 @@ export function EventDetail() {
       .catch(() => { if (!cancelled) setMatchesLoading(false); });
     return () => { cancelled = true; };
   }, [key]);
+
+  // Fetch rankings when Rankings tab is first opened
+  useEffect(() => {
+    if (tab !== 'rankings' || !key || rankings.length > 0) return;
+    fetchEventRankings(key).then(setRankings);
+  }, [tab, key, rankings.length]);
 
   // Fetch team numbers when Teams tab is first opened
   useEffect(() => {

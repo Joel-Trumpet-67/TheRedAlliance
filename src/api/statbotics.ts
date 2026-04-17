@@ -59,6 +59,21 @@ export interface SBTeamEvent {
   district: string | null;
   start_date?: string;
   end_date?: string;
+  record?: {
+    qual?: {
+      rank:          number;
+      num_teams:     number;
+      wins:          number;
+      losses:        number;
+      ties:          number;
+      count:         number;
+      rps:           number;
+      rps_per_match: number;
+    };
+  };
+  epa?: {
+    total_points?: { mean: number; sd: number };
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -181,6 +196,31 @@ export async function fetchEventsForYear(year: number): Promise<SBEvent[]> {
  * Fetches the team numbers attending a specific event.
  * Used by EventDetail to populate the Teams tab on demand.
  */
+/** Fetches and adapts event rankings from Statbotics team_events. */
+export async function fetchEventRankings(eventKey: string): Promise<import('../data/mockData').Ranking[]> {
+  try {
+    const res = await fetch(`${BASE}/team_events?event=${eventKey}&limit=200`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return [];
+    const data: SBTeamEvent[] = await res.json();
+    return data
+      .filter(te => te.record?.qual?.rank != null)
+      .map(te => ({
+        team_number: te.team,
+        rank:        te.record!.qual!.rank,
+        wins:        te.record!.qual!.wins,
+        losses:      te.record!.qual!.losses,
+        ties:        te.record!.qual!.ties,
+        rp:          te.record!.qual!.rps,
+        avg_score:   te.epa?.total_points?.mean ?? 0,
+      }))
+      .sort((a, b) => a.rank - b.rank);
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchTeamNumbersForEvent(eventKey: string): Promise<number[]> {
   try {
     const res = await fetch(`${BASE}/team_events?event=${eventKey}&limit=200`, {
