@@ -47,6 +47,8 @@ export interface Event {
   status?: string;
   /** Livestream URL */
   video?: string;
+  /** District abbreviation e.g. 'fim', 'fit', 'fma', 'ne', 'in', 'ont' */
+  district?: string | null;
 }
 
 export interface Ranking {

@@ -36,6 +36,7 @@ export function adaptEvent(sb: SBEvent): Event {
     num_teams:  sb.num_teams,
     status:     sb.status,
     video:      sb.video ?? undefined,
+    district:   sb.district,
   };
 }
 
@@ -70,9 +71,13 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
     fetchEventsForYear(year)
       .then(data => {
         if (cancelled) return;
-        setEvents(data.map(adaptEvent).sort((a, b) =>
-          (a.week ?? 99) - (b.week ?? 99) || a.start_date.localeCompare(b.start_date)
-        ));
+        setEvents(data.map(adaptEvent).sort((a, b) => {
+          const weekDiff = (a.week ?? 99) - (b.week ?? 99);
+          if (weekDiff !== 0) return weekDiff;
+          const da = a.district ?? 'zzz';
+          const db = b.district ?? 'zzz';
+          return da.localeCompare(db) || a.name.localeCompare(b.name);
+        }));
         setLoading(false);
       })
       .catch(err => {
