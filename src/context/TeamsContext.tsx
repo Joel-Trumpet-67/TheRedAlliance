@@ -16,7 +16,7 @@ function adapt(sb: SBTeam): Team {
     losses:      sb.record.losses,
     ties:        sb.record.ties,
     awards:      0,
-    epa:         sb.norm_epa.current,
+    epa:         sb.epa?.total_points?.mean ?? undefined,
   };
 }
 

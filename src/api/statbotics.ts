@@ -21,6 +21,10 @@ export interface SBTeam {
     mean: number;
     max: number;
   };
+  epa?: {
+    total_points?: { mean: number; sd: number };
+    unitless?:     { mean: number; sd: number };
+  };
 }
 
 // ─── Event interfaces ────────────────────────────────────────────────────────
