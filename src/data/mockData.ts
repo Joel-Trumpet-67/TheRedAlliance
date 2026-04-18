@@ -11,7 +11,7 @@ export interface Team {
   ties: number;
   awards: number;
   ranking?: number;
-  /** Normalised EPA from Statbotics (higher = stronger team) */
+  /** Expected Points Added — avg per-robot contribution in actual game points (current year) */
   epa?: number;
 }
 

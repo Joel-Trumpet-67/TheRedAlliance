@@ -1,13 +1,12 @@
-/** Raw shape returned by Statbotics /v3/teams */
+/** Raw shape returned by Statbotics /v3/team_years (year-specific data) */
 export interface SBTeam {
-  team: number;
-  name: string;
-  country: string | null;
-  state: string | null;
-  district: string | null;
+  team:        number;
+  year:        number;
+  name:        string;
+  country:     string | null;
+  state:       string | null;
+  district:    string | null;
   rookie_year: number;
-  active: boolean;
-  last_active_year: number;
   record: {
     wins: number;
     losses: number;
@@ -15,16 +14,11 @@ export interface SBTeam {
     count: number;
     winrate: number;
   };
-  norm_epa: {
-    current: number;
-    recent: number;
-    mean: number;
-    max: number;
-  };
-  epa?: {
-    total_points?: { mean: number; sd: number };
-    unitless?:     { mean: number; sd: number };
-  };
+  epa: {
+    total_points: { mean: number; sd: number } | null;
+    unitless?:    { mean: number; sd: number } | null;
+    norm?:        { mean: number } | null;
+  } | null;
 }
 
 // ─── Event interfaces ────────────────────────────────────────────────────────
@@ -86,13 +80,13 @@ const BASE      = 'https://api.statbotics.io/v3';
 const LIMIT     = 1000;
 const MAX_PAGES = 20;
 const YEAR      = new Date().getFullYear();
-const CACHE_KEY = `sb_teams_v4_${YEAR}`;  // versioned + year-keyed
+const CACHE_KEY = `sb_teams_v5_${YEAR}`;  // bump when endpoint/schema changes
 const CACHE_TTL = 24 * 60 * 60 * 1000;
 
 async function fetchPage(page: number): Promise<SBTeam[]> {
   try {
     const res = await fetch(
-      `${BASE}/teams?year=${YEAR}&limit=${LIMIT}&offset=${page * LIMIT}`,
+      `${BASE}/team_years?year=${YEAR}&limit=${LIMIT}&offset=${page * LIMIT}`,
       { headers: { Accept: 'application/json' } }
     );
     if (!res.ok) return [];
