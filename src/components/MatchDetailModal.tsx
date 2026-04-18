@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import type { Match } from '../data/mockData';
 import { parseTBAAllianceBreakdown, type TBAMatch } from '../api/tba';
@@ -94,7 +95,7 @@ export function MatchDetailModal({ match, tbaMatch, onClose }: Props) {
     );
   }
 
-  return (
+  return createPortal(
     <>
       <div className="modal-overlay" onClick={close} />
       <div ref={sheetRef} className={`modal-sheet${isOpen ? ' open' : ''}`}>
@@ -168,6 +169,7 @@ export function MatchDetailModal({ match, tbaMatch, onClose }: Props) {
           </>
         )}
       </div>
-    </>
+    </>,
+    document.body
   );
 }
