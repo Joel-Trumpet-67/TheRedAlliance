@@ -155,3 +155,27 @@ export async function fetchTBATeamMatches(teamNumber: number, year: number): Pro
     });
   } catch { return []; }
 }
+
+export interface TBADistrictRanking {
+  team_key: string;
+  rank: number;
+  point_total: number;
+  rookie_bonus: number;
+  event_points: Array<{
+    event_key: string;
+    district_cmp: boolean;
+    total: number;
+    alliance_points: number;
+    award_points: number;
+    qual_points: number;
+    elim_points: number;
+  }>;
+}
+
+export async function fetchDistrictRankings(districtKey: string): Promise<TBADistrictRanking[]> {
+  try {
+    const res = await fetch(`${BASE}/district/${districtKey}/rankings`, { headers: h() });
+    if (!res.ok) return [];
+    return res.json();
+  } catch { return []; }
+}

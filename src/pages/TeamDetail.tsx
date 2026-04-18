@@ -9,6 +9,7 @@ import { useCountUp } from '../hooks/useCountUp';
 import { useTeams } from '../context/TeamsContext';
 import { fetchTeamEvents, type SBTeamEvent } from '../api/statbotics';
 import { fetchTBATeamMatches, adaptTBAMatch, type TBAMatch } from '../api/tba';
+import { MY_TEAM } from '../constants';
 import type { Event, Match } from '../data/mockData';
 
 function adaptSBTeamEvent(sb: SBTeamEvent): Event {
@@ -255,7 +256,7 @@ export function TeamDetail() {
         ) : (
           <div className="card" ref={matchesRef}>
             {matches.map(m => (
-              <MatchRow key={m.key} match={m} highlightTeam={team.number} onClick={setSelectedMatch} />
+              <MatchRow key={m.key} match={m} highlightTeam={MY_TEAM} onClick={setSelectedMatch} />
             ))}
           </div>
         )

@@ -7,12 +7,19 @@ import { useStagger } from '../hooks/useStagger';
 type SortKey = 'number' | 'wins' | 'epa';
 
 export function Teams() {
-  const [query, setQuery] = useState('');
-  const [sort,  setSort]  = useState<SortKey>('wins');
+  const [query,    setQuery]    = useState('');
+  const [sort,     setSort]     = useState<SortKey>('wins');
+  const [top100,   setTop100]   = useState(false);
   const { teams, loading, count } = useTeams();
   const pageRef = usePageEntrance();
 
-  const filtered = teams
+  // Build the top-100 list (sorted by EPA desc, only teams with EPA data first)
+  const top100List = [...teams]
+    .filter(t => t.epa != null)
+    .sort((a, b) => (b.epa ?? 0) - (a.epa ?? 0))
+    .slice(0, 100);
+
+  const filtered = (top100 ? top100List : teams)
     .filter(t => {
       const q = query.toLowerCase();
       return (
@@ -24,12 +31,13 @@ export function Teams() {
       );
     })
     .sort((a, b) => {
+      if (top100) return (b.epa ?? 0) - (a.epa ?? 0); // always EPA-sorted in top100 mode
       if (sort === 'number') return a.number - b.number;
       if (sort === 'epa')    return (b.epa ?? 0) - (a.epa ?? 0);
       return b.wins - a.wins;
     });
 
-  const listRef = useStagger<HTMLDivElement>([loading, sort, query]);
+  const listRef = useStagger<HTMLDivElement>([loading, sort, query, top100]);
 
   return (
     <div className="page" ref={pageRef}>
@@ -62,9 +70,16 @@ export function Teams() {
       </div>
 
       <div className="tabs" style={{ marginBottom: '1rem' }}>
-        <button className={`tab-btn${sort === 'wins'   ? ' active' : ''}`} onClick={() => setSort('wins')}>By Wins</button>
-        <button className={`tab-btn${sort === 'epa'    ? ' active' : ''}`} onClick={() => setSort('epa')}>By EPA</button>
-        <button className={`tab-btn${sort === 'number' ? ' active' : ''}`} onClick={() => setSort('number')}>By Number</button>
+        <button className={`tab-btn${sort === 'wins'   ? ' active' : ''}`} onClick={() => { setSort('wins');   setTop100(false); }}>By Wins</button>
+        <button className={`tab-btn${sort === 'epa'    ? ' active' : ''}`} onClick={() => { setSort('epa');    setTop100(false); }}>By EPA</button>
+        <button className={`tab-btn${sort === 'number' ? ' active' : ''}`} onClick={() => { setSort('number'); setTop100(false); }}>By Number</button>
+        <button
+          className={`tab-btn${top100 ? ' active' : ''}`}
+          style={top100 ? { color: '#fbbf24', borderColor: 'rgba(251,191,36,0.4)' } : undefined}
+          onClick={() => setTop100(v => !v)}
+        >
+          Top 100
+        </button>
       </div>
 
       {loading && teams.length === 0 ? (
@@ -86,11 +101,28 @@ export function Teams() {
       ) : filtered.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">🤖</div>
-          <div>No teams found for "{query}"</div>
+          <div>No teams found{query ? ` for "${query}"` : ''}</div>
         </div>
       ) : (
         <div className="card-list" ref={listRef}>
-          {filtered.map(t => <TeamCard key={t.number} team={t} />)}
+          {filtered.map((t, idx) => (
+            <div key={t.number} style={{ position: 'relative' }}>
+              {top100 && (
+                <span style={{
+                  position: 'absolute', top: 8, right: 8, zIndex: 1,
+                  fontSize: '0.65rem', fontWeight: 800,
+                  padding: '2px 7px', borderRadius: 5,
+                  background: 'rgba(251,191,36,0.12)',
+                  color: '#fbbf24',
+                  border: '1px solid rgba(251,191,36,0.25)',
+                  pointerEvents: 'none',
+                }}>
+                  #{idx + 1}
+                </span>
+              )}
+              <TeamCard team={t} />
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -5,6 +5,7 @@ import { Teams } from './pages/Teams';
 import { TeamDetail } from './pages/TeamDetail';
 import { Events } from './pages/Events';
 import { EventDetail } from './pages/EventDetail';
+import { Districts } from './pages/Districts';
 import { TeamsProvider } from './context/TeamsContext';
 import { EventsProvider } from './context/EventsContext';
 import { PinnedEventsProvider } from './context/PinnedEventsContext';
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/teams/:number" element={<TeamDetail />} />
           <Route path="/events" element={<Events />} />
           <Route path="/events/:key" element={<EventDetail />} />
+          <Route path="/districts" element={<Districts />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         <BottomNav />

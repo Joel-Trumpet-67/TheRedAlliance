@@ -12,6 +12,7 @@ import {
   fetchTBAEventMatches, fetchTBAEventRankings, fetchTBAEventTeams,
   adaptTBAMatch, type TBAMatch,
 } from '../api/tba';
+import { MY_TEAM } from '../constants';
 import {
   fetchEventMatches, fetchEventRankings, fetchTeamNumbersForEvent, adaptMatch,
 } from '../api/statbotics';
@@ -297,7 +298,7 @@ export function EventDetail() {
               <div style={{ marginBottom: '1rem' }}>
                 <div className="section-title" style={{ marginBottom: '0.4rem' }}>Qualification Matches</div>
                 <div className="card">
-                  {quals.map(m => <MatchRow key={m.key} match={m} onClick={setSelectedMatch} />)}
+                  {quals.map(m => <MatchRow key={m.key} match={m} highlightTeam={MY_TEAM} onClick={setSelectedMatch} />)}
                 </div>
               </div>
             )}
@@ -305,7 +306,7 @@ export function EventDetail() {
               <div>
                 <div className="section-title" style={{ marginBottom: '0.4rem' }}>Playoff Matches</div>
                 <div className="card">
-                  {playoffs.map(m => <MatchRow key={m.key} match={m} onClick={setSelectedMatch} />)}
+                  {playoffs.map(m => <MatchRow key={m.key} match={m} highlightTeam={MY_TEAM} onClick={setSelectedMatch} />)}
                 </div>
               </div>
             )}
@@ -359,7 +360,7 @@ export function EventDetail() {
               </thead>
               <tbody>
                 {rankings.map(r => (
-                  <tr key={r.team_number}>
+                  <tr key={r.team_number} className={r.team_number === MY_TEAM ? 'my-team-row' : ''}>
                     <td className="rank-num">{r.rank}</td>
                     <td><Link to={`/teams/${r.team_number}`} className="team-link">{r.team_number}</Link></td>
                     <td style={{ color: 'var(--text-secondary)' }}>{r.wins}-{r.losses}-{r.ties}</td>
