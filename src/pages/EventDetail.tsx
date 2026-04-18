@@ -12,6 +12,9 @@ import {
   fetchTBAEventMatches, fetchTBAEventRankings, fetchTBAEventTeams,
   adaptTBAMatch, type TBAMatch,
 } from '../api/tba';
+import {
+  fetchEventMatches, fetchEventRankings, fetchTeamNumbersForEvent, adaptMatch,
+} from '../api/statbotics';
 
 type Tab = 'matches' | 'rankings' | 'teams';
 
@@ -63,16 +66,30 @@ export function EventDetail() {
     setMatches(raw.map(adaptTBAMatch));
   }
 
-  // Initial fetch from TBA
+  // Initial fetch — TBA primary, Statbotics fallback
   useEffect(() => {
     if (!key) return;
     let cancelled = false;
     setMatchesLoading(true);
-    fetchTBAEventMatches(key).then(raw => {
+    fetchTBAEventMatches(key).then(async raw => {
       if (cancelled) return;
-      applyMatches(raw);
+      if (raw.length > 0) {
+        applyMatches(raw);
+      } else {
+        // TBA returned nothing (missing key or network error) — fall back to Statbotics
+        const sbRaw = await fetchEventMatches(key);
+        if (!cancelled && sbRaw.length > 0) {
+          setRawMatches([]);   // no TBAMatch to store
+          setMatches(sbRaw.map(adaptMatch));
+        }
+      }
       setMatchesLoading(false);
-    }).catch(() => { if (!cancelled) setMatchesLoading(false); });
+    }).catch(async () => {
+      if (cancelled) return;
+      const sbRaw = await fetchEventMatches(key);
+      if (!cancelled) { setMatches(sbRaw.map(adaptMatch)); }
+      setMatchesLoading(false);
+    });
     return () => { cancelled = true; };
   }, [key]);
 
@@ -91,19 +108,24 @@ export function EventDetail() {
     return () => clearInterval(id);
   }, [key, event?.status, tab]);
 
-  // Fetch rankings from TBA when Rankings tab first opened
+  // Fetch rankings — TBA primary, Statbotics fallback
   useEffect(() => {
     if (tab !== 'rankings' || !key || rankings.length > 0 || rankingsLoading) return;
     setRankingsLoading(true);
-    fetchTBAEventRankings(key).then(r => { setRankings(r); setRankingsLoading(false); });
+    fetchTBAEventRankings(key).then(async r => {
+      if (r.length > 0) { setRankings(r); }
+      else { const sb = await fetchEventRankings(key); setRankings(sb); }
+      setRankingsLoading(false);
+    });
   }, [tab, key, rankings.length, rankingsLoading]);
 
-  // Fetch team numbers from TBA when Teams tab first opened
+  // Fetch teams — TBA primary, Statbotics fallback
   useEffect(() => {
     if (tab !== 'teams' || !key || eventTeamNums.length > 0 || teamsLoading) return;
     setTeamsLoading(true);
-    fetchTBAEventTeams(key).then(nums => {
-      setEventTeamNums(nums);
+    fetchTBAEventTeams(key).then(async nums => {
+      if (nums.length > 0) { setEventTeamNums(nums); }
+      else { const sb = await fetchTeamNumbersForEvent(key); setEventTeamNums(sb.sort((a,b) => a-b)); }
       setTeamsLoading(false);
     });
   }, [tab, key, eventTeamNums.length, teamsLoading]);
