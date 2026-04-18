@@ -53,6 +53,7 @@ export function EventDetail() {
   const [rawMatches,    setRawMatches]    = useState<SBMatch[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+  const [matchFilter,   setMatchFilter]   = useState('');
 
   // Fetch real matches from Statbotics on load
   useEffect(() => {
@@ -78,6 +79,33 @@ export function EventDetail() {
       .catch(() => { if (!cancelled) setMatchesLoading(false); });
     return () => { cancelled = true; };
   }, [key]);
+
+  // Clear match filter when tab changes
+  useEffect(() => { setMatchFilter(''); }, [tab]);
+
+  // Auto-refresh polling for in-progress events
+  useEffect(() => {
+    if (!key || event?.status !== 'In Progress') return;
+    const id = setInterval(() => {
+      fetchEventMatches(key).then(raw => {
+        try {
+          const sorted = [...raw].sort((a, b) => {
+            const lvl = ['qm', 'qf', 'sf', 'f'];
+            const li = lvl.indexOf(a.comp_level), lj = lvl.indexOf(b.comp_level);
+            if (li !== lj) return li - lj;
+            if (a.set_number !== b.set_number) return a.set_number - b.set_number;
+            return a.match_number - b.match_number;
+          });
+          setRawMatches(sorted);
+          setMatches(sorted.map(adaptMatch));
+        } catch { /* ignore bad data */ }
+      });
+      if (tab === 'rankings' && key) {
+        fetchEventRankings(key).then(r => { if (r.length > 0) setRankings(r); });
+      }
+    }, 30000);
+    return () => clearInterval(id);
+  }, [key, event?.status, tab]);
 
   // Fetch rankings when Rankings tab is first opened
   useEffect(() => {
@@ -215,7 +243,9 @@ export function EventDetail() {
       </div>
 
       <div className="tabs">
-        <button className={`tab-btn${tab === 'matches'  ? ' active' : ''}`} onClick={() => setTab('matches')}>Matches</button>
+        <button className={`tab-btn${tab === 'matches'  ? ' active' : ''}`} onClick={() => setTab('matches')}>
+          Matches {event?.status === 'In Progress' && <span className="live-badge"><span className="live-dot"/>LIVE</span>}
+        </button>
         <button className={`tab-btn${tab === 'rankings' ? ' active' : ''}`} onClick={() => setTab('rankings')}>Rankings</button>
         <button className={`tab-btn${tab === 'teams'    ? ' active' : ''}`} onClick={() => setTab('teams')}>
           Teams{teamCount ? ` (${teamCount})` : ''}
@@ -223,8 +253,15 @@ export function EventDetail() {
       </div>
 
       {tab === 'matches' && (() => {
-        const quals    = matches.filter(m => m.comp_level === 'qm');
-        const playoffs = matches.filter(m => m.comp_level !== 'qm');
+        const today = new Date().toISOString().slice(0, 10);
+        const filtered = matchFilter.trim()
+          ? matches.filter(m =>
+              [...m.red_alliance, ...m.blue_alliance]
+                .some(num => String(num).includes(matchFilter.trim()))
+            )
+          : matches;
+        const quals    = filtered.filter(m => m.comp_level === 'qm');
+        const playoffs = filtered.filter(m => m.comp_level !== 'qm');
         return (
           <>
             {matchesLoading && (
@@ -237,6 +274,17 @@ export function EventDetail() {
                     <div className="skeleton skeleton-line" style={{ width: '22%', height: 34 }} />
                   </div>
                 ))}
+              </div>
+            )}
+            {!matchesLoading && matches.length > 0 && (
+              <div className="search-bar">
+                <input
+                  className="search-input"
+                  style={{ paddingLeft: '1rem' }}
+                  placeholder="Filter by team number…"
+                  value={matchFilter}
+                  onChange={e => setMatchFilter(e.target.value)}
+                />
               </div>
             )}
             {!matchesLoading && quals.length > 0 && (
@@ -258,7 +306,17 @@ export function EventDetail() {
             {!matchesLoading && matches.length === 0 && (
               <div className="empty-state">
                 <div className="empty-icon">⚙️</div>
-                <div>Match schedule not yet available</div>
+                <div>
+                  {event?.start_date && event.start_date > today
+                    ? `Match schedule posts closer to the event · Starts ${new Date(event.start_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
+                    : 'Match schedule not yet available'}
+                </div>
+              </div>
+            )}
+            {!matchesLoading && matches.length > 0 && filtered.length === 0 && (
+              <div className="empty-state">
+                <div className="empty-icon">🔍</div>
+                <div>No matches found for team "{matchFilter}"</div>
               </div>
             )}
           </>

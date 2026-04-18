@@ -7,7 +7,7 @@ import { usePageEntrance } from '../hooks/usePageEntrance';
 import { useStagger } from '../hooks/useStagger';
 import { useCountUp } from '../hooks/useCountUp';
 import { useTeams } from '../context/TeamsContext';
-import { fetchTeamEvents, fetchEventMatches, adaptMatch, type SBTeamEvent, type SBMatch } from '../api/statbotics';
+import { fetchTeamEvents, fetchTeamMatchesForYear, adaptMatch, type SBTeamEvent, type SBMatch } from '../api/statbotics';
 import type { Event, Match } from '../data/mockData';
 
 function adaptSBTeamEvent(sb: SBTeamEvent): Event {
@@ -84,18 +84,14 @@ export function TeamDetail() {
     });
   }, [team?.number, evYear]);
 
-  // Fetch real matches for all events this team attended
+  // Fetch real matches for this team in a single API call
   useEffect(() => {
-    if (!team || teamEvents.length === 0) { setMatches([]); setRawMatches([]); return; }
+    if (!team) { setMatches([]); setRawMatches([]); return; }
     let cancelled = false;
     setMatchesLoading(true);
-    Promise.all(teamEvents.map(e => fetchEventMatches(e.key))).then(results => {
+    fetchTeamMatchesForYear(team.number, evYear).then(raw => {
       if (cancelled) return;
-      const teamNum = team.number;
-      const allRaw = results.flat().filter(m =>
-        m.alliances?.red?.team_keys?.includes(teamNum) ||
-        m.alliances?.blue?.team_keys?.includes(teamNum)
-      ).sort((a, b) => {
+      const allRaw = [...raw].sort((a, b) => {
         if (a.event !== b.event) return a.event.localeCompare(b.event);
         const lvl = ['qm', 'qf', 'sf', 'f'];
         const li = lvl.indexOf(a.comp_level), lj = lvl.indexOf(b.comp_level);
@@ -108,7 +104,7 @@ export function TeamDetail() {
       setMatchesLoading(false);
     });
     return () => { cancelled = true; };
-  }, [team?.number, teamEvents]);
+  }, [team?.number, evYear]);
 
   const eventsRef  = useStagger<HTMLDivElement>([tab, team?.number, evYear, eventsLoading]);
   const matchesRef = useStagger<HTMLDivElement>([tab, team?.number, matches.length]);
@@ -185,7 +181,9 @@ export function TeamDetail() {
           </div>
           {team.epa != null && (
             <div className="stat-chip">
-              <div className="stat-chip-label">EPA</div>
+              <div className="stat-chip-label">
+                EPA <span className="epa-info" title="Expected Points Added — measures a team's average scoring contribution per match">ⓘ</span>
+              </div>
               <div className="stat-chip-value" style={{ color: 'var(--red-400)' }}>
                 {team.epa.toFixed(0)}
               </div>
@@ -199,7 +197,7 @@ export function TeamDetail() {
           Events
         </button>
         <button className={`tab-btn${tab === 'matches' ? ' active' : ''}`} onClick={() => setTab('matches')}>
-          Matches ({matches.length})
+          Matches ({matchesLoading ? '…' : matches.length})
         </button>
       </div>
 

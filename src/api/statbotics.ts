@@ -325,6 +325,19 @@ export async function fetchEventMatches(eventKey: string): Promise<SBMatch[]> {
   }
 }
 
+/** Fetches all matches for a specific team in a given year. */
+export async function fetchTeamMatchesForYear(teamNumber: number, year: number): Promise<SBMatch[]> {
+  try {
+    const res = await fetch(`${BASE}/matches?team=${teamNumber}&year=${year}&limit=300`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
 /** Fetches a single match with full breakdown. */
 export async function fetchMatch(matchKey: string): Promise<SBMatch | null> {
   try {
