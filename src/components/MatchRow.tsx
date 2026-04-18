@@ -6,9 +6,10 @@ interface Props {
   match:          Match;
   highlightTeam?: number;
   onClick?:       (match: Match) => void;
+  projected?:     { red: number | null; blue: number | null };
 }
 
-export function MatchRow({ match, highlightTeam, onClick }: Props) {
+export function MatchRow({ match, highlightTeam, onClick, projected }: Props) {
   const redWon  = match.winning_alliance === 'red';
   const blueWon = match.winning_alliance === 'blue';
 
@@ -36,9 +37,25 @@ export function MatchRow({ match, highlightTeam, onClick }: Props) {
       </div>
 
       <div className="match-scores">
-        <div className={`score-box red${redWon ? ' winner' : ''}`}>{match.red_score ?? '–'}</div>
-        <span className="score-separator">–</span>
-        <div className={`score-box blue${blueWon ? ' winner' : ''}`}>{match.blue_score ?? '–'}</div>
+        {match.red_score != null ? (
+          <>
+            <div className={`score-box red${redWon ? ' winner' : ''}`}>{match.red_score}</div>
+            <span className="score-separator">–</span>
+            <div className={`score-box blue${blueWon ? ' winner' : ''}`}>{match.blue_score}</div>
+          </>
+        ) : projected?.red != null || projected?.blue != null ? (
+          <>
+            <div className="score-box red projected">{projected.red != null ? `~${projected.red}` : '–'}</div>
+            <span className="score-separator">–</span>
+            <div className="score-box blue projected">{projected.blue != null ? `~${projected.blue}` : '–'}</div>
+          </>
+        ) : (
+          <>
+            <div className="score-box red">–</div>
+            <span className="score-separator">–</span>
+            <div className="score-box blue">–</div>
+          </>
+        )}
       </div>
 
       <div className="alliance-teams blue">

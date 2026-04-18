@@ -72,6 +72,12 @@ export function TeamDetail() {
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [selectedMatch,  setSelectedMatch]  = useState<Match | null>(null);
 
+  function projectAlliance(alliance: number[]): number | null {
+    const epas = alliance.map(n => teams.find(t => t.number === n)?.epa ?? null);
+    if (epas.every(e => e == null)) return null;
+    return Math.round(epas.reduce<number>((s, e) => s + (e ?? 0), 0));
+  }
+
   // Avg alliance score ÷ 3 = per-robot contribution for this year
   const computedEPA = useMemo(() => {
     const played = matches.filter(m => m.red_score != null);
@@ -267,7 +273,12 @@ export function TeamDetail() {
         ) : (
           <div className="card" ref={matchesRef}>
             {matches.map(m => (
-              <MatchRow key={m.key} match={m} highlightTeam={MY_TEAM} onClick={setSelectedMatch} />
+              <MatchRow key={m.key} match={m} highlightTeam={MY_TEAM} onClick={setSelectedMatch}
+                projected={m.red_score == null ? {
+                  red:  projectAlliance(m.red_alliance),
+                  blue: projectAlliance(m.blue_alliance),
+                } : undefined}
+              />
             ))}
           </div>
         )

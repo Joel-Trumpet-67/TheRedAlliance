@@ -318,8 +318,9 @@ input { font-family: inherit; font-size: 16px; } /* 16px prevents iOS auto-zoom 
 
 .score-box.red  { background: rgba(185,28,28,0.2);  color: #fca5a5; border: 1px solid rgba(185,28,28,0.35); }
 .score-box.blue { background: rgba(37,99,235,0.2);  color: #93c5fd; border: 1px solid rgba(37,99,235,0.35); }
-.score-box.winner     { background: rgba(185,28,28,0.45); color: #fff; border-color: rgba(239,68,68,0.6); box-shadow: 0 0 10px rgba(239,68,68,0.25); }
+.score-box.winner      { background: rgba(185,28,28,0.45); color: #fff; border-color: rgba(239,68,68,0.6); box-shadow: 0 0 10px rgba(239,68,68,0.25); }
 .score-box.blue.winner { background: rgba(37,99,235,0.45); color: #fff; border-color: rgba(96,165,250,0.6); box-shadow: 0 0 10px rgba(96,165,250,0.25); }
+.score-box.projected   { opacity: 0.65; font-style: italic; letter-spacing: -0.02em; }
 
 .score-separator { font-size: 0.72rem; color: var(--text-muted); }
 
@@ -1105,3 +1106,130 @@ input { font-family: inherit; font-size: 16px; } /* 16px prevents iOS auto-zoom 
   border-bottom: 1px dashed rgba(251,191,36,0.4);
   background: rgba(251,191,36,0.05);
 }
+
+/* ===== PLAYOFF BRACKET ===== */
+.bracket-wrap { display: flex; flex-direction: column; gap: 1.5rem; }
+
+.bracket-round-title {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  margin-bottom: 0.6rem;
+}
+
+.bracket-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+/* Series card */
+.bs-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.bs-card.done { border-color: rgba(255,255,255,0.12); }
+
+.bs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.65rem 0.3rem;
+  border-bottom: 1px solid var(--border);
+}
+.bs-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+.bs-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.bs-badge.red    { background: rgba(185,28,28,0.25);  color: #f87171; }
+.bs-badge.blue   { background: rgba(37,99,235,0.25);  color: #60a5fa; }
+.bs-badge.ongoing{ background: rgba(255,255,255,0.07); color: var(--text-secondary); }
+
+/* Alliance rows */
+.bs-alliance {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.65rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: opacity 0.2s;
+}
+.bs-alliance:last-of-type { border-bottom: none; }
+.bs-alliance.loser  { opacity: 0.45; }
+.bs-alliance.winner { opacity: 1; }
+
+.bs-dots { display: flex; gap: 3px; flex-shrink: 0; }
+.bs-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+}
+.bs-dot.red  { background: #f87171; }
+.bs-dot.blue { background: #60a5fa; }
+
+.bs-teams { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
+.bs-team {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+.bs-team:hover { color: var(--text-primary); }
+.bs-team.mine  { color: var(--red-400) !important; font-weight: 800; }
+
+.bs-proj {
+  font-size: 0.7rem;
+  font-style: italic;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* Match score chips */
+.bs-match-scores {
+  display: flex;
+  gap: 4px;
+  padding: 0.3rem 0.65rem;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.bs-score-btn {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-size: 0.68rem;
+  transition: background 0.15s;
+}
+.bs-score-btn:hover { background: rgba(255,255,255,0.1); }
+.bs-score-btn.pending { color: var(--text-muted); font-style: italic; cursor: default; }
+.bss { font-weight: 700; }
+.bss.red  { color: #f87171; }
+.bss.blue { color: #60a5fa; }
+.bss.red.w  { color: #fca5a5; }
+.bss.blue.w { color: #93c5fd; }
+.bss-sep { color: var(--text-muted); margin: 0 1px; }
+
+/* Finals card: full width */
+.bracket-round:last-child .bs-card {
+  border-color: rgba(251,191,36,0.25);
+  background: rgba(251,191,36,0.03);
+}
+.bracket-round:last-child .bs-label { color: #fbbf24; }

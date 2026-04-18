@@ -2,6 +2,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import type { Match, Ranking } from '../data/mockData';
 import { MatchRow } from '../components/MatchRow';
 import { MatchDetailModal } from '../components/MatchDetailModal';
+import { PlayoffBracket } from '../components/PlayoffBracket';
 import { useEffect, useState } from 'react';
 import { usePageEntrance } from '../hooks/usePageEntrance';
 import { useStagger } from '../hooks/useStagger';
@@ -17,7 +18,7 @@ import {
   fetchEventMatches, fetchEventRankings, fetchTeamNumbersForEvent, adaptMatch,
 } from '../api/statbotics';
 
-type Tab = 'matches' | 'rankings' | 'teams';
+type Tab = 'matches' | 'bracket' | 'rankings' | 'teams';
 
 function formatDate(start: string, end: string) {
   const s = new Date(start + 'T12:00:00');
@@ -179,6 +180,14 @@ export function EventDetail() {
   const teamCount = event.num_teams ?? eventTeamNums.length;
   const location  = [event.state, event.country].filter(Boolean).join(', ');
 
+  function projectScore(alliance: number[]): number | null {
+    const epas = alliance.map(n => teams.find(t => t.number === n)?.epa ?? null);
+    if (epas.every(e => e == null)) return null;
+    return Math.round(epas.reduce<number>((s, e) => s + (e ?? 0), 0));
+  }
+
+  const playoffMatches = matches.filter(m => m.comp_level !== 'qm');
+
   const pinned = event ? isPinned(event.key) : false;
 
   return (
@@ -254,6 +263,11 @@ export function EventDetail() {
         <button className={`tab-btn${tab === 'matches'  ? ' active' : ''}`} onClick={() => setTab('matches')}>
           Matches {event?.status === 'In Progress' && <span className="live-badge"><span className="live-dot"/>LIVE</span>}
         </button>
+        {playoffMatches.length > 0 && (
+          <button className={`tab-btn${tab === 'bracket' ? ' active' : ''}`} onClick={() => setTab('bracket')}>
+            Bracket
+          </button>
+        )}
         <button className={`tab-btn${tab === 'rankings' ? ' active' : ''}`} onClick={() => setTab('rankings')}>Rankings</button>
         <button className={`tab-btn${tab === 'teams'    ? ' active' : ''}`} onClick={() => setTab('teams')}>
           Teams{teamCount ? ` (${teamCount})` : ''}
@@ -299,7 +313,14 @@ export function EventDetail() {
               <div style={{ marginBottom: '1rem' }}>
                 <div className="section-title" style={{ marginBottom: '0.4rem' }}>Qualification Matches</div>
                 <div className="card">
-                  {quals.map(m => <MatchRow key={m.key} match={m} highlightTeam={MY_TEAM} onClick={setSelectedMatch} />)}
+                  {quals.map(m => (
+                    <MatchRow key={m.key} match={m} highlightTeam={MY_TEAM} onClick={setSelectedMatch}
+                      projected={m.red_score == null ? {
+                        red:  projectScore(m.red_alliance),
+                        blue: projectScore(m.blue_alliance),
+                      } : undefined}
+                    />
+                  ))}
                 </div>
               </div>
             )}
@@ -307,7 +328,14 @@ export function EventDetail() {
               <div>
                 <div className="section-title" style={{ marginBottom: '0.4rem' }}>Playoff Matches</div>
                 <div className="card">
-                  {playoffs.map(m => <MatchRow key={m.key} match={m} highlightTeam={MY_TEAM} onClick={setSelectedMatch} />)}
+                  {playoffs.map(m => (
+                    <MatchRow key={m.key} match={m} highlightTeam={MY_TEAM} onClick={setSelectedMatch}
+                      projected={m.red_score == null ? {
+                        red:  projectScore(m.red_alliance),
+                        blue: projectScore(m.blue_alliance),
+                      } : undefined}
+                    />
+                  ))}
                 </div>
               </div>
             )}
@@ -330,6 +358,15 @@ export function EventDetail() {
           </>
         );
       })()}
+
+      {tab === 'bracket' && (
+        <PlayoffBracket
+          matches={playoffMatches}
+          teams={teams}
+          highlightTeam={MY_TEAM}
+          onMatchClick={setSelectedMatch}
+        />
+      )}
 
       {tab === 'rankings' && (
         rankingsLoading ? (
@@ -408,8 +445,13 @@ export function EventDetail() {
                         {[t.city, t.state].filter(Boolean).join(', ')}
                       </div>
                     </div>
-                    <div className="record-text" style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-                      {t.wins}-{t.losses}
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{t.wins}-{t.losses}</div>
+                      {t.epa != null && (
+                        <div style={{ fontSize: '0.72rem', color: 'var(--red-400)', fontWeight: 700, marginTop: 1 }}>
+                          EPA {t.epa.toFixed(0)}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </Link>
