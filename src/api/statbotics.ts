@@ -83,15 +83,16 @@ export interface SBTeamEvent {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const BASE      = 'https://api.statbotics.io/v3';
-const LIMIT     = 1000;           // max Statbotics allows per page
-const MAX_PAGES = 20;             // 20 × 1000 = 20 000 teams ceiling (plenty)
-const CACHE_KEY = 'sb_teams_v2';
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const LIMIT     = 1000;
+const MAX_PAGES = 20;
+const YEAR      = new Date().getFullYear();
+const CACHE_KEY = `sb_teams_v4_${YEAR}`;  // versioned + year-keyed
+const CACHE_TTL = 24 * 60 * 60 * 1000;
 
 async function fetchPage(page: number): Promise<SBTeam[]> {
   try {
     const res = await fetch(
-      `${BASE}/teams?limit=${LIMIT}&offset=${page * LIMIT}`,
+      `${BASE}/teams?year=${YEAR}&limit=${LIMIT}&offset=${page * LIMIT}`,
       { headers: { Accept: 'application/json' } }
     );
     if (!res.ok) return [];

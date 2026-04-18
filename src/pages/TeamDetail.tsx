@@ -2,7 +2,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { EventCard } from '../components/EventCard';
 import { MatchRow } from '../components/MatchRow';
 import { MatchDetailModal } from '../components/MatchDetailModal';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { usePageEntrance } from '../hooks/usePageEntrance';
 import { useStagger } from '../hooks/useStagger';
 import { useCountUp } from '../hooks/useCountUp';
@@ -71,6 +71,17 @@ export function TeamDetail() {
   const [rawMatches,     setRawMatches]     = useState<TBAMatch[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [selectedMatch,  setSelectedMatch]  = useState<Match | null>(null);
+
+  // Avg alliance score ÷ 3 = per-robot contribution for this year
+  const computedEPA = useMemo(() => {
+    const played = matches.filter(m => m.red_score != null);
+    if (!played.length) return undefined;
+    const num = team?.number ?? 0;
+    const avg = played.reduce((s, m) =>
+      s + (m.red_alliance.includes(num) ? (m.red_score ?? 0) : (m.blue_score ?? 0)), 0
+    ) / played.length;
+    return Math.round(avg / 3);
+  }, [matches, team?.number]);
 
   useEffect(() => {
     if (!team) return;
@@ -173,13 +184,13 @@ export function TeamDetail() {
             <div className="stat-chip-label">Win %</div>
             <div className="stat-chip-value">{winRate}%</div>
           </div>
-          {team.epa != null && (
+          {(computedEPA != null || team.epa != null) && (
             <div className="stat-chip">
               <div className="stat-chip-label">
-                EPA <span className="epa-info" title="Expected Points Added — measures a team's average scoring contribution per match">ⓘ</span>
+                EPA <span className="epa-info" title={computedEPA != null ? `Avg alliance score ÷ 3 from ${evYear} matches` : 'Expected Points Added (Statbotics)'}>ⓘ</span>
               </div>
               <div className="stat-chip-value" style={{ color: 'var(--red-400)' }}>
-                {team.epa.toFixed(0)}
+                {(computedEPA ?? team.epa)?.toFixed(0)}
               </div>
             </div>
           )}

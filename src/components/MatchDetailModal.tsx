@@ -2,30 +2,103 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import type { Match } from '../data/mockData';
-import { parseTBAAllianceBreakdown, type TBAMatch } from '../api/tba';
+import type { TBAMatch } from '../api/tba';
 import { useTeams } from '../context/TeamsContext';
 
 interface Props {
-  match:    Match | null;
-  tbaMatch: TBAMatch | null;
-  onClose:  () => void;
+  match:      Match | null;
+  tbaMatch:   TBAMatch | null;
+  eventName?: string;
+  onClose:    () => void;
 }
 
-function Row({ label, red, blue, redClass = '', blueClass = '' }: {
-  label: string; red: string | number; blue: string | number;
-  redClass?: string; blueClass?: string;
-}) {
-  return (
-    <div className="mbd-row">
-      <span className={`mbd-val red ${redClass}`}>{red}</span>
-      <span className="mbd-label">{label}</span>
-      <span className={`mbd-val blue ${blueClass}`}>{blue}</span>
-    </div>
-  );
+// camelCase → readable label, optionally stripping a known prefix
+function fmtLabel(key: string, stripPrefix = ''): string {
+  let s = stripPrefix && key.toLowerCase().startsWith(stripPrefix.toLowerCase())
+    ? key.slice(stripPrefix.length)
+    : key;
+  if (!s) s = key;
+  return s
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/(\d+)/g, ' $1')
+    .replace(/\s+/g, ' ')
+    .trim() || key;
 }
 
+function fmtVal(v: unknown): string {
+  if (v === null || v === undefined) return '—';
+  if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+  return String(v);
+}
 
-export function MatchDetailModal({ match, tbaMatch, onClose }: Props) {
+const SKIP   = new Set(['tba_gameData', 'coopertitionBonus', 'coopertitionCriteriaMet']);
+const FOOTER = ['foulCount', 'techFoulCount', 'foulPoints', 'adjustPoints', 'totalPoints', 'rp'];
+
+type BdRow =
+  | { kind: 'section'; label: string }
+  | { kind: 'row'; label: string; red: string; blue: string; bold?: 'red' | 'blue' | 'both' };
+
+function buildBreakdown(
+  redRaw: Record<string, unknown>,
+  blueRaw: Record<string, unknown>,
+  redWon: boolean,
+  blueWon: boolean,
+): BdRow[] {
+  const rows: BdRow[] = [];
+  const allKeys = [...new Set([...Object.keys(redRaw), ...Object.keys(blueRaw)])];
+  const seen = new Set<string>();
+
+  const SECTIONS = [
+    { prefix: 'auto',    label: 'Auto'    },
+    { prefix: 'teleop',  label: 'Teleop'  },
+    { prefix: 'endGame', label: 'Endgame' },
+  ];
+
+  for (const { prefix, label } of SECTIONS) {
+    const keys = allKeys.filter(k =>
+      k.toLowerCase().startsWith(prefix.toLowerCase()) &&
+      !SKIP.has(k) && !FOOTER.includes(k) && !seen.has(k)
+    );
+    if (!keys.length) continue;
+    rows.push({ kind: 'section', label });
+    for (const k of keys) {
+      rows.push({ kind: 'row', label: fmtLabel(k, prefix), red: fmtVal(redRaw[k]), blue: fmtVal(blueRaw[k]) });
+      seen.add(k);
+    }
+  }
+
+  // Remaining non-footer keys
+  for (const k of allKeys.filter(k => !seen.has(k) && !SKIP.has(k) && !FOOTER.includes(k))) {
+    rows.push({ kind: 'row', label: fmtLabel(k), red: fmtVal(redRaw[k]), blue: fmtVal(blueRaw[k]) });
+  }
+
+  // Footer
+  const footerKeys = FOOTER.filter(k => k in redRaw);
+  if (footerKeys.length) {
+    rows.push({ kind: 'section', label: 'Final' });
+    for (const k of footerKeys) {
+      if (k === 'rp') {
+        rows.push({
+          kind: 'row', label: 'Ranking Points',
+          red:  redRaw.rp  != null ? `+${redRaw.rp} RP`  : '—',
+          blue: blueRaw.rp != null ? `+${blueRaw.rp} RP` : '—',
+        });
+      } else {
+        rows.push({
+          kind: 'row',
+          label: fmtLabel(k),
+          red:   fmtVal(redRaw[k]),
+          blue:  fmtVal(blueRaw[k]),
+          bold:  k === 'totalPoints' ? (redWon && blueWon ? 'both' : redWon ? 'red' : blueWon ? 'blue' : undefined) : undefined,
+        });
+      }
+    }
+  }
+
+  return rows;
+}
+
+export function MatchDetailModal({ match, tbaMatch, eventName, onClose }: Props) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const { teams } = useTeams();
@@ -52,42 +125,35 @@ export function MatchDetailModal({ match, tbaMatch, onClose }: Props) {
     setTimeout(onClose, 320);
   }
 
-  // ── EPA-based projected scores ────────────────────────────────────────────
-  // Each team's EPA = their average scoring contribution per match.
-  // Alliance projected score = sum of each robot's EPA.
-  function allianceProjection(alliance: number[]): number | null {
-    const epas = alliance.map(num => teams.find(t => t.number === num)?.epa ?? null);
+  function allianceEPA(alliance: number[]): number | null {
+    const epas = alliance.map(n => teams.find(t => t.number === n)?.epa ?? null);
     if (epas.every(e => e == null)) return null;
     return Math.round(epas.reduce<number>((s, e) => s + (e ?? 0), 0));
   }
 
-  const redProjected  = match.red_score  == null ? allianceProjection(match.red_alliance)  : null;
-  const blueProjected = match.blue_score == null ? allianceProjection(match.blue_alliance) : null;
+  const redProjected  = match.red_score  == null ? allianceEPA(match.red_alliance)  : null;
+  const blueProjected = match.blue_score == null ? allianceEPA(match.blue_alliance) : null;
 
-  // ── TBA score breakdown ───────────────────────────────────────────────────
-  const bd = tbaMatch?.score_breakdown;
-  const redBd  = bd ? parseTBAAllianceBreakdown(bd.red)  : null;
-  const blueBd = bd ? parseTBAAllianceBreakdown(bd.blue) : null;
+  const bd      = tbaMatch?.score_breakdown;
+  const redRaw  = bd?.red  as Record<string, unknown> | undefined;
+  const blueRaw = bd?.blue as Record<string, unknown> | undefined;
+  const bdRows  = redRaw && blueRaw ? buildBreakdown(redRaw, blueRaw, redWon, blueWon) : [];
 
-  // ── Individual EPA rows for upcoming matches ──────────────────────────────
   function EpaRows({ alliance, color }: { alliance: number[]; color: 'red' | 'blue' }) {
-    const rows = alliance.map(num => {
-      const t = teams.find(t => t.number === num);
-      return { num, epa: t?.epa ?? null, name: t?.name };
-    });
+    const rows = alliance.map(n => ({ n, epa: teams.find(t => t.number === n)?.epa ?? null }));
     if (rows.every(r => r.epa == null)) return null;
     return (
       <div className="mbd-card" style={{ marginTop: '0.5rem' }}>
-        {rows.map(({ num, epa }) => (
-          <div key={num} className="mbd-row">
+        {rows.map(({ n, epa }) => (
+          <div key={n} className="mbd-row">
             <span className={`mbd-val ${color}`} style={{ fontSize: '0.78rem' }}>
-              {color === 'red' ? (epa != null ? `+${Math.round(epa)}` : '—') : ''}
+              {color === 'red' ? (epa != null ? `~${Math.round(epa)}` : '—') : ''}
             </span>
             <span className="mbd-label">
-              <Link to={`/teams/${num}`} onClick={close} style={{ color: 'inherit' }}>{num}</Link>
+              <Link to={`/teams/${n}`} onClick={close} style={{ color: 'inherit' }}>{n}</Link>
             </span>
             <span className={`mbd-val ${color}`} style={{ fontSize: '0.78rem' }}>
-              {color === 'blue' ? (epa != null ? `+${Math.round(epa)}` : '—') : ''}
+              {color === 'blue' ? (epa != null ? `~${Math.round(epa)}` : '—') : ''}
             </span>
           </div>
         ))}
@@ -103,62 +169,67 @@ export function MatchDetailModal({ match, tbaMatch, onClose }: Props) {
 
         {/* Header */}
         <div className="modal-header">
-          <span className="modal-title">{label}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="modal-title">{label}</div>
+            {eventName && (
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 1,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {eventName}
+              </div>
+            )}
+          </div>
           <button className="modal-close" onClick={close}>✕</button>
         </div>
 
-        {/* Alliance scores */}
-        <div className="modal-alliances">
-          <div className={`modal-alliance-block red${redWon ? ' winner' : ''}`}>
-            <div className="modal-alliance-teams">
-              {match.red_alliance.map(t => (
-                <Link key={t} to={`/teams/${t}`} onClick={close} className="modal-team red">{t}</Link>
-              ))}
-            </div>
-            <div className="modal-big-score">
+        {/* Teams + scores table */}
+        <div className="mbd-teams-table">
+          <div className="mbd-teams-col red">
+            {match.red_alliance.map(t => (
+              <Link key={t} to={`/teams/${t}`} onClick={close} className="mbd-team-num red">{t}</Link>
+            ))}
+          </div>
+          <div className="mbd-score-col">
+            <div className={`mbd-score red${redWon ? ' winner' : ''}`}>
               {match.red_score ?? (redProjected != null ? `~${redProjected}` : '–')}
             </div>
-            {redProjected != null && (
-              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2 }}>projected</div>
-            )}
-          </div>
-
-          <div className="modal-vs">vs</div>
-
-          <div className={`modal-alliance-block blue${blueWon ? ' winner' : ''}`}>
-            <div className="modal-big-score">
+            <div className="mbd-score-sep">–</div>
+            <div className={`mbd-score blue${blueWon ? ' winner' : ''}`}>
               {match.blue_score ?? (blueProjected != null ? `~${blueProjected}` : '–')}
             </div>
-            {blueProjected != null && (
-              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2 }}>projected</div>
+            {(redProjected != null || blueProjected != null) && (
+              <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: 3 }}>
+                projected
+              </div>
             )}
-            <div className="modal-alliance-teams right">
-              {match.blue_alliance.map(t => (
-                <Link key={t} to={`/teams/${t}`} onClick={close} className="modal-team blue">{t}</Link>
-              ))}
-            </div>
+          </div>
+          <div className="mbd-teams-col blue">
+            {match.blue_alliance.map(t => (
+              <Link key={t} to={`/teams/${t}`} onClick={close} className="mbd-team-num blue">{t}</Link>
+            ))}
           </div>
         </div>
 
-        {/* Completed match — TBA score breakdown */}
-        {redBd && blueBd && (
+        {/* Detailed results */}
+        {bdRows.length > 0 && (
           <>
-            <div className="mbd-section-title">Score Breakdown</div>
+            <div className="mbd-section-title">Detailed Results</div>
             <div className="mbd-card">
-              <Row label="Total"   red={match.red_score ?? 0}  blue={match.blue_score ?? 0}
-                   redClass={redWon ? 'strong' : ''} blueClass={blueWon ? 'strong' : ''} />
-              <Row label="Auto"    red={redBd.auto}    blue={blueBd.auto} />
-              <Row label="Teleop"  red={redBd.teleop}  blue={blueBd.teleop} />
-              <Row label="Endgame" red={redBd.endgame} blue={blueBd.endgame} />
-              {(redBd.foul > 0 || blueBd.foul > 0) && (
-                <Row label="Fouls +" red={redBd.foul} blue={blueBd.foul}
-                     redClass="muted" blueClass="muted" />
+              {bdRows.map((row, i) =>
+                row.kind === 'section' ? (
+                  <div key={i} className="mbd-group-header">{row.label}</div>
+                ) : (
+                  <div key={i} className="mbd-row">
+                    <span className={`mbd-val red${row.bold === 'red' || row.bold === 'both' ? ' strong' : ''}`}>{row.red}</span>
+                    <span className="mbd-label">{row.label}</span>
+                    <span className={`mbd-val blue${row.bold === 'blue' || row.bold === 'both' ? ' strong' : ''}`}>{row.blue}</span>
+                  </div>
+                )
               )}
             </div>
           </>
         )}
 
-        {/* Upcoming match — EPA projection per robot */}
+        {/* Upcoming — per-robot EPA projection */}
         {match.red_score == null && (redProjected != null || blueProjected != null) && (
           <>
             <div className="mbd-section-title">EPA Projection · Per Robot</div>

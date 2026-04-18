@@ -186,6 +186,7 @@ export function EventDetail() {
       <MatchDetailModal
         match={selectedMatch}
         tbaMatch={selectedMatch ? (rawMatches.find(r => r.key === selectedMatch.key) ?? null) : null}
+        eventName={event?.name}
         onClose={() => setSelectedMatch(null)}
       />
 
