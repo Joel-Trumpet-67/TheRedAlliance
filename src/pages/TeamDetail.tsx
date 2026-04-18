@@ -7,7 +7,8 @@ import { usePageEntrance } from '../hooks/usePageEntrance';
 import { useStagger } from '../hooks/useStagger';
 import { useCountUp } from '../hooks/useCountUp';
 import { useTeams } from '../context/TeamsContext';
-import { fetchTeamEvents, fetchTeamMatchesForYear, adaptMatch, type SBTeamEvent, type SBMatch } from '../api/statbotics';
+import { fetchTeamEvents, type SBTeamEvent } from '../api/statbotics';
+import { fetchTBATeamMatches, adaptTBAMatch, type TBAMatch } from '../api/tba';
 import type { Event, Match } from '../data/mockData';
 
 function adaptSBTeamEvent(sb: SBTeamEvent): Event {
@@ -66,7 +67,7 @@ export function TeamDetail() {
 
   // Real matches fetched from Statbotics
   const [matches,        setMatches]        = useState<Match[]>([]);
-  const [rawMatches,     setRawMatches]     = useState<SBMatch[]>([]);
+  const [rawMatches,     setRawMatches]     = useState<TBAMatch[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [selectedMatch,  setSelectedMatch]  = useState<Match | null>(null);
 
@@ -89,18 +90,10 @@ export function TeamDetail() {
     if (!team) { setMatches([]); setRawMatches([]); return; }
     let cancelled = false;
     setMatchesLoading(true);
-    fetchTeamMatchesForYear(team.number, evYear).then(raw => {
+    fetchTBATeamMatches(team.number, evYear).then(raw => {
       if (cancelled) return;
-      const allRaw = [...raw].sort((a, b) => {
-        if (a.event !== b.event) return a.event.localeCompare(b.event);
-        const lvl = ['qm', 'qf', 'sf', 'f'];
-        const li = lvl.indexOf(a.comp_level), lj = lvl.indexOf(b.comp_level);
-        if (li !== lj) return li - lj;
-        if (a.set_number !== b.set_number) return a.set_number - b.set_number;
-        return a.match_number - b.match_number;
-      });
-      setRawMatches(allRaw);
-      setMatches(allRaw.map(adaptMatch));
+      setRawMatches(raw);
+      setMatches(raw.map(adaptTBAMatch));
       setMatchesLoading(false);
     });
     return () => { cancelled = true; };
@@ -151,7 +144,7 @@ export function TeamDetail() {
     <div className="page" ref={pageRef}>
       <MatchDetailModal
         match={selectedMatch}
-        sbMatch={selectedMatch ? (rawMatches.find(r => r.key === selectedMatch.key) ?? null) : null}
+        tbaMatch={selectedMatch ? (rawMatches.find(r => r.key === selectedMatch.key) ?? null) : null}
         onClose={() => setSelectedMatch(null)}
       />
       <Link to="/teams" className="back-btn">← Teams</Link>

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Match } from '../data/mockData';
-import type { SBMatch } from '../api/statbotics';
+import { parseTBAAllianceBreakdown, type TBAMatch } from '../api/tba';
+import { useTeams } from '../context/TeamsContext';
 
 interface Props {
   match:    Match | null;
-  sbMatch:  SBMatch | null;
+  tbaMatch: TBAMatch | null;
   onClose:  () => void;
 }
 
@@ -22,24 +23,12 @@ function Row({ label, red, blue, redClass = '', blueClass = '' }: {
   );
 }
 
-function RpRow({ label, redEarned, blueEarned }: {
-  label: string; redEarned: boolean; blueEarned: boolean;
-}) {
-  return (
-    <div className="mbd-row">
-      <span className={`rp-dot ${redEarned ? 'earned' : ''}`}>{redEarned ? '✓' : '✗'}</span>
-      <span className="mbd-label">{label}</span>
-      <span className={`rp-dot ${blueEarned ? 'earned' : ''}`}>{blueEarned ? '✓' : '✗'}</span>
-    </div>
-  );
-}
 
-export function MatchDetailModal({ match, sbMatch, onClose }: Props) {
-  const sheetRef   = useRef<HTMLDivElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
+export function MatchDetailModal({ match, tbaMatch, onClose }: Props) {
+  const sheetRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const { teams } = useTeams();
 
-  // Open: trigger CSS transition on next frame so translateY(100%) is painted first
   useEffect(() => {
     if (!match) return;
     const raf = requestAnimationFrame(() => setIsOpen(true));
@@ -47,8 +36,6 @@ export function MatchDetailModal({ match, sbMatch, onClose }: Props) {
   }, [match]);
 
   if (!match) return null;
-
-  const detail = sbMatch;
 
   const label = match.comp_level === 'qm'
     ? `Qual ${match.match_number}`
@@ -64,9 +51,52 @@ export function MatchDetailModal({ match, sbMatch, onClose }: Props) {
     setTimeout(onClose, 320);
   }
 
+  // ── EPA-based projected scores ────────────────────────────────────────────
+  // Each team's EPA = their average scoring contribution per match.
+  // Alliance projected score = sum of each robot's EPA.
+  function allianceProjection(alliance: number[]): number | null {
+    const epas = alliance.map(num => teams.find(t => t.number === num)?.epa ?? null);
+    if (epas.every(e => e == null)) return null;
+    return Math.round(epas.reduce<number>((s, e) => s + (e ?? 0), 0));
+  }
+
+  const redProjected  = match.red_score  == null ? allianceProjection(match.red_alliance)  : null;
+  const blueProjected = match.blue_score == null ? allianceProjection(match.blue_alliance) : null;
+
+  // ── TBA score breakdown ───────────────────────────────────────────────────
+  const bd = tbaMatch?.score_breakdown;
+  const redBd  = bd ? parseTBAAllianceBreakdown(bd.red)  : null;
+  const blueBd = bd ? parseTBAAllianceBreakdown(bd.blue) : null;
+
+  // ── Individual EPA rows for upcoming matches ──────────────────────────────
+  function EpaRows({ alliance, color }: { alliance: number[]; color: 'red' | 'blue' }) {
+    const rows = alliance.map(num => {
+      const t = teams.find(t => t.number === num);
+      return { num, epa: t?.epa ?? null, name: t?.name };
+    });
+    if (rows.every(r => r.epa == null)) return null;
+    return (
+      <div className="mbd-card" style={{ marginTop: '0.5rem' }}>
+        {rows.map(({ num, epa }) => (
+          <div key={num} className="mbd-row">
+            <span className={`mbd-val ${color}`} style={{ fontSize: '0.78rem' }}>
+              {color === 'red' ? (epa != null ? `+${Math.round(epa)}` : '—') : ''}
+            </span>
+            <span className="mbd-label">
+              <Link to={`/teams/${num}`} onClick={close} style={{ color: 'inherit' }}>{num}</Link>
+            </span>
+            <span className={`mbd-val ${color}`} style={{ fontSize: '0.78rem' }}>
+              {color === 'blue' ? (epa != null ? `+${Math.round(epa)}` : '—') : ''}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <>
-      <div ref={overlayRef} className="modal-overlay" onClick={close} />
+      <div className="modal-overlay" onClick={close} />
       <div ref={sheetRef} className={`modal-sheet${isOpen ? ' open' : ''}`}>
         <div className="modal-handle" />
 
@@ -84,13 +114,23 @@ export function MatchDetailModal({ match, sbMatch, onClose }: Props) {
                 <Link key={t} to={`/teams/${t}`} onClick={close} className="modal-team red">{t}</Link>
               ))}
             </div>
-            <div className="modal-big-score">{match.red_score ?? '–'}</div>
+            <div className="modal-big-score">
+              {match.red_score ?? (redProjected != null ? `~${redProjected}` : '–')}
+            </div>
+            {redProjected != null && (
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2 }}>projected</div>
+            )}
           </div>
 
           <div className="modal-vs">vs</div>
 
           <div className={`modal-alliance-block blue${blueWon ? ' winner' : ''}`}>
-            <div className="modal-big-score">{match.blue_score ?? '–'}</div>
+            <div className="modal-big-score">
+              {match.blue_score ?? (blueProjected != null ? `~${blueProjected}` : '–')}
+            </div>
+            {blueProjected != null && (
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2 }}>projected</div>
+            )}
             <div className="modal-alliance-teams right">
               {match.blue_alliance.map(t => (
                 <Link key={t} to={`/teams/${t}`} onClick={close} className="modal-team blue">{t}</Link>
@@ -99,92 +139,34 @@ export function MatchDetailModal({ match, sbMatch, onClose }: Props) {
           </div>
         </div>
 
-        {detail?.result && (() => {
-          const res  = detail.result!;
-          const pred = detail.pred;
-          const redFouls  = res.red_score  - res.red_no_foul;
-          const blueFouls = res.blue_score - res.blue_no_foul;
-          return (
-            <>
-              {/* Score breakdown */}
-              <div className="mbd-section-title">Score Breakdown</div>
-              <div className="mbd-card">
-                <Row label="Total"   red={res.red_score}           blue={res.blue_score}
-                     redClass={redWon ? 'strong' : ''} blueClass={blueWon ? 'strong' : ''} />
-                <Row label="Auto"    red={res.red_auto_points}     blue={res.blue_auto_points} />
-                <Row label="Teleop"  red={res.red_teleop_points}   blue={res.blue_teleop_points} />
-                <Row label="Endgame" red={res.red_endgame_points}  blue={res.blue_endgame_points} />
-                {(redFouls > 0 || blueFouls > 0) && (
-                  <Row label="Fouls +" red={redFouls} blue={blueFouls} redClass="muted" blueClass="muted" />
-                )}
-              </div>
-
-              {/* Ranking points (qual only) */}
-              {match.comp_level === 'qm' && (
-                <>
-                  <div className="mbd-section-title">Ranking Points</div>
-                  <div className="mbd-card">
-                    <RpRow label="RP 1" redEarned={res.red_rp_1}  blueEarned={res.blue_rp_1} />
-                    <RpRow label="RP 2" redEarned={res.red_rp_2}  blueEarned={res.blue_rp_2} />
-                    {(res.red_rp_3 !== undefined) && (
-                      <RpRow label="RP 3" redEarned={!!res.red_rp_3} blueEarned={!!res.blue_rp_3} />
-                    )}
-                    <RpRow label="Win"  redEarned={redWon}         blueEarned={blueWon} />
-                  </div>
-                </>
-              )}
-
-              {/* Predictions */}
-              {pred && (
-                <>
-                  <div className="mbd-section-title">Predictions</div>
-                  <div className="mbd-card">
-                    <Row label="Predicted Score"
-                         red={pred.red_score.toFixed(1)}
-                         blue={pred.blue_score.toFixed(1)} />
-                    <Row label="Win Probability"
-                         red={`${(pred.red_win_prob * 100).toFixed(0)}%`}
-                         blue={`${((1 - pred.red_win_prob) * 100).toFixed(0)}%`} />
-                    <Row label="RP 1 Chance"
-                         red={`${(pred.red_rp_1 * 100).toFixed(0)}%`}
-                         blue={`${(pred.blue_rp_1 * 100).toFixed(0)}%`}
-                         redClass="muted" blueClass="muted" />
-                    <Row label="RP 2 Chance"
-                         red={`${(pred.red_rp_2 * 100).toFixed(0)}%`}
-                         blue={`${(pred.blue_rp_2 * 100).toFixed(0)}%`}
-                         redClass="muted" blueClass="muted" />
-                  </div>
-                </>
-              )}
-            </>
-          );
-        })()}
-
-        {/* Upcoming match — show predictions only */}
-        {!detail?.result && detail?.pred && (() => {
-          const pred = detail.pred!;
-          return (
-            <>
-              <div className="mbd-section-title">Predictions</div>
-              <div className="mbd-card">
-                <Row label="Predicted Score"
-                     red={pred.red_score.toFixed(1)}
-                     blue={pred.blue_score.toFixed(1)} />
-                <Row label="Win Probability"
-                     red={`${(pred.red_win_prob * 100).toFixed(0)}%`}
-                     blue={`${((1 - pred.red_win_prob) * 100).toFixed(0)}%`} />
-                <Row label="RP 1 Chance"
-                     red={`${(pred.red_rp_1 * 100).toFixed(0)}%`}
-                     blue={`${(pred.blue_rp_1 * 100).toFixed(0)}%`}
+        {/* Completed match — TBA score breakdown */}
+        {redBd && blueBd && (
+          <>
+            <div className="mbd-section-title">Score Breakdown</div>
+            <div className="mbd-card">
+              <Row label="Total"   red={match.red_score ?? 0}  blue={match.blue_score ?? 0}
+                   redClass={redWon ? 'strong' : ''} blueClass={blueWon ? 'strong' : ''} />
+              <Row label="Auto"    red={redBd.auto}    blue={blueBd.auto} />
+              <Row label="Teleop"  red={redBd.teleop}  blue={blueBd.teleop} />
+              <Row label="Endgame" red={redBd.endgame} blue={blueBd.endgame} />
+              {(redBd.foul > 0 || blueBd.foul > 0) && (
+                <Row label="Fouls +" red={redBd.foul} blue={blueBd.foul}
                      redClass="muted" blueClass="muted" />
-                <Row label="RP 2 Chance"
-                     red={`${(pred.red_rp_2 * 100).toFixed(0)}%`}
-                     blue={`${(pred.blue_rp_2 * 100).toFixed(0)}%`}
-                     redClass="muted" blueClass="muted" />
-              </div>
-            </>
-          );
-        })()}
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Upcoming match — EPA projection per robot */}
+        {match.red_score == null && (redProjected != null || blueProjected != null) && (
+          <>
+            <div className="mbd-section-title">EPA Projection · Per Robot</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              <EpaRows alliance={match.red_alliance}  color="red" />
+              <EpaRows alliance={match.blue_alliance} color="blue" />
+            </div>
+          </>
+        )}
       </div>
     </>
   );

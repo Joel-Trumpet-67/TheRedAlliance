@@ -8,7 +8,10 @@ import { useStagger } from '../hooks/useStagger';
 import { useTeams } from '../context/TeamsContext';
 import { useEvents } from '../context/EventsContext';
 import { usePinnedEvents } from '../context/PinnedEventsContext';
-import { fetchTeamNumbersForEvent, fetchEventMatches, fetchEventRankings, adaptMatch, type SBMatch } from '../api/statbotics';
+import {
+  fetchTBAEventMatches, fetchTBAEventRankings, fetchTBAEventTeams,
+  adaptTBAMatch, type TBAMatch,
+} from '../api/tba';
 
 type Tab = 'matches' | 'rankings' | 'teams';
 
@@ -48,78 +51,59 @@ export function EventDetail() {
   const [rankings, setRankings] = useState<Ranking[]>([]);
   const [rankingsLoading, setRankingsLoading] = useState(false);
 
-  // Real matches from Statbotics
-  const [matches,       setMatches]       = useState<Match[]>([]);
-  const [rawMatches,    setRawMatches]    = useState<SBMatch[]>([]);
+  // Live match data from TBA
+  const [matches,        setMatches]        = useState<Match[]>([]);
+  const [rawMatches,     setRawMatches]     = useState<TBAMatch[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
-  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
-  const [matchFilter,   setMatchFilter]   = useState('');
+  const [selectedMatch,  setSelectedMatch]  = useState<Match | null>(null);
+  const [matchFilter,    setMatchFilter]    = useState('');
 
-  // Fetch real matches from Statbotics on load
+  function applyMatches(raw: TBAMatch[]) {
+    setRawMatches(raw);
+    setMatches(raw.map(adaptTBAMatch));
+  }
+
+  // Initial fetch from TBA
   useEffect(() => {
     if (!key) return;
     let cancelled = false;
     setMatchesLoading(true);
-    fetchEventMatches(key)
-      .then(raw => {
-        if (cancelled) return;
-        try {
-          const sorted = [...raw].sort((a, b) => {
-            const lvl = ['qm', 'qf', 'sf', 'f'];
-            const li = lvl.indexOf(a.comp_level), lj = lvl.indexOf(b.comp_level);
-            if (li !== lj) return li - lj;
-            if (a.set_number !== b.set_number) return a.set_number - b.set_number;
-            return a.match_number - b.match_number;
-          });
-          setRawMatches(sorted);
-          setMatches(sorted.map(adaptMatch));
-        } catch { /* bad data — leave matches empty */ }
-        setMatchesLoading(false);
-      })
-      .catch(() => { if (!cancelled) setMatchesLoading(false); });
+    fetchTBAEventMatches(key).then(raw => {
+      if (cancelled) return;
+      applyMatches(raw);
+      setMatchesLoading(false);
+    }).catch(() => { if (!cancelled) setMatchesLoading(false); });
     return () => { cancelled = true; };
   }, [key]);
 
   // Clear match filter when tab changes
   useEffect(() => { setMatchFilter(''); }, [tab]);
 
-  // Auto-refresh polling for in-progress events
+  // 30s polling when event is in progress (TBA is the official live source)
   useEffect(() => {
     if (!key || event?.status !== 'In Progress') return;
     const id = setInterval(() => {
-      fetchEventMatches(key).then(raw => {
-        try {
-          const sorted = [...raw].sort((a, b) => {
-            const lvl = ['qm', 'qf', 'sf', 'f'];
-            const li = lvl.indexOf(a.comp_level), lj = lvl.indexOf(b.comp_level);
-            if (li !== lj) return li - lj;
-            if (a.set_number !== b.set_number) return a.set_number - b.set_number;
-            return a.match_number - b.match_number;
-          });
-          setRawMatches(sorted);
-          setMatches(sorted.map(adaptMatch));
-        } catch { /* ignore bad data */ }
-      });
+      fetchTBAEventMatches(key).then(raw => { if (raw.length) applyMatches(raw); });
       if (tab === 'rankings' && key) {
-        fetchEventRankings(key).then(r => { if (r.length > 0) setRankings(r); });
+        fetchTBAEventRankings(key).then(r => { if (r.length) setRankings(r); });
       }
     }, 30000);
     return () => clearInterval(id);
   }, [key, event?.status, tab]);
 
-  // Fetch rankings when Rankings tab is first opened
+  // Fetch rankings from TBA when Rankings tab first opened
   useEffect(() => {
     if (tab !== 'rankings' || !key || rankings.length > 0 || rankingsLoading) return;
     setRankingsLoading(true);
-    fetchEventRankings(key).then(r => { setRankings(r); setRankingsLoading(false); });
+    fetchTBAEventRankings(key).then(r => { setRankings(r); setRankingsLoading(false); });
   }, [tab, key, rankings.length, rankingsLoading]);
 
-  // Fetch team numbers when Teams tab is first opened
+  // Fetch team numbers from TBA when Teams tab first opened
   useEffect(() => {
     if (tab !== 'teams' || !key || eventTeamNums.length > 0 || teamsLoading) return;
     setTeamsLoading(true);
-    fetchTeamNumbersForEvent(key).then(nums => {
-      setEventTeamNums(nums.sort((a, b) => a - b));
+    fetchTBAEventTeams(key).then(nums => {
+      setEventTeamNums(nums);
       setTeamsLoading(false);
     });
   }, [tab, key, eventTeamNums.length, teamsLoading]);
@@ -178,7 +162,7 @@ export function EventDetail() {
     <div className="page" ref={pageRef}>
       <MatchDetailModal
         match={selectedMatch}
-        sbMatch={selectedMatch ? (rawMatches.find(r => r.key === selectedMatch.key) ?? null) : null}
+        tbaMatch={selectedMatch ? (rawMatches.find(r => r.key === selectedMatch.key) ?? null) : null}
         onClose={() => setSelectedMatch(null)}
       />
 
